@@ -1,0 +1,81 @@
+import argparse
+import numpy as np
+from torch import nn
+from src.config import TrainConfig 
+from src.ultis import *
+
+
+def train(
+    npratio: int,
+    history_size: int,
+    batch_size: int,
+    gradient_accumulation_steps: int,
+    epochs: int,
+    learning_rate: float,
+    weight_decay: float,
+    max_len: int,
+    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
+) -> None:
+    logging.info("Start")
+    """
+    0. Definite Parameters & Functions
+    """
+    # hidden_size: int = AutoConfig.from_pretrained(pretrained).hidden_size
+    # loss_fn = nn.CrossEntropyLoss()
+    # transform_fn = create_transform_fn_from_pretrained_tokenizer(AutoTokenizer.from_pretrained(pretrained), max_len)
+
+    # """
+    # 1. Init Model
+    # """
+    # logging.info("Initialize Model")
+    # news_encoder = PLMBasedNewsEncoder(pretrained)
+    # user_encoder = UserEncoder(hidden_size=hidden_size)
+    # nrms_net = NRMS(news_encoder=news_encoder, user_encoder=user_encoder, hidden_size=hidden_size, loss_fn=loss_fn).to(
+    #     device, dtype=torch.bfloat16)
+
+    """
+    2. Load Data & Create Dataset
+    """
+    # logging.info("Initialize Dataset")
+    # train_data_dir = './data/MINDsmall_train'
+    # train_news_df = read_news_df(os.path.join(train_data_dir, 'news.tsv'))
+    # train_behavior_df = read_behavior_df(os.path.join(train_data_dir, 'behaviors.tsv'))
+    # logging.info(train_behavior_df[0])
+    # train_dataset = MINDTrainDataset(train_behavior_df, train_news_df, transform_fn, npratio, history_size, device)
+    
+    # test_data_dir = './data/MINDsmall_dev'
+    # val_news_df = read_news_df(os.path.join(test_data_dir, 'news.tsv'))
+    # val_behavior_df = read_behavior_df(os.path.join(test_data_dir, 'behaviors.tsv'))
+    # eval_dataset = MINDValDataset(val_behavior_df, val_news_df, transform_fn, history_size)
+
+    """
+    3. Train
+    """
+    logging.info("Training Start")
+    # 
+    """
+    4. Evaluate model by Validation Dataset
+    """
+    logging.info("Evaluation")
+    # metrics = evaluate(trainer.model, eval_dataset, device)
+    # logging.info(metrics.dict())
+
+
+def main(cfg: TrainConfig) -> None:
+    try:
+        set_random_seed(cfg.random_seed)
+        train(
+            cfg.npratio,
+            cfg.history_size,
+            cfg.batch_size,
+            cfg.gradient_accumulation_steps,
+            cfg.epochs,
+            cfg.learning_rate,
+            cfg.weight_decay,
+            cfg.max_len,
+        )
+    except Exception as e:
+        logging.error(e)
+
+if __name__ == "__main__":
+    main(TrainConfig)
