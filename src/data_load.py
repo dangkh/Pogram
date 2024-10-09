@@ -254,7 +254,7 @@ class NewsDataset(Dataset):
 
 
 def load_data(cfg, mode='train', model=None, local_rank=0):
-    data_dir = {"train": cfg.dataset.train_dir, "val": cfg.dataset.val_dir, "test": cfg.dataset.test_dir}
+    data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}
 
     # ------------- load news.tsv-------------
     news_index = pickle.load(open(Path(data_dir[mode]) / "news_dict.bin", "rb"))
@@ -262,7 +262,7 @@ def load_data(cfg, mode='train', model=None, local_rank=0):
     news_input = pickle.load(open(Path(data_dir[mode]) / "nltk_token_news.bin", "rb"))
     # ------------- load behaviors_np{X}.tsv --------------
     if mode == 'train':
-        target_file = Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_{local_rank}.tsv"
+        target_file = Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_0.tsv"
         if cfg.use_graph:
             news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt")
 
@@ -309,16 +309,15 @@ def load_data(cfg, mode='train', model=None, local_rank=0):
         # convert the news to embeddings
         news_dataset = NewsDataset(news_input)
         news_dataloader = DataLoader(news_dataset,
-                                     batch_size=int(cfg.batch_size * cfg.gpu_num),
-                                     num_workers=cfg.num_workers)
+                                     batch_size=int(cfg.batch_size * cfg.gpu_num))
 
         stacked_news = []
         with torch.no_grad():
             for news_batch in tqdm(news_dataloader, desc=f"[{local_rank}] Processing validation News Embedding"):
                 if cfg.use_graph:
-                    batch_emb = model.module.local_news_encoder(news_batch.long().unsqueeze(0).to(local_rank)).squeeze(0).detach()
+                    batch_emb = model.local_news_encoder(news_batch.long().unsqueeze(0).to(local_rank)).squeeze(0).detach()
                 else:
-                    batch_emb = model.module.local_news_encoder(news_batch.long().unsqueeze(0).to(local_rank)).squeeze(0).detach()
+                    batch_emb = model.local_news_encoder(news_batch.long().unsqueeze(0).to(local_rank)).squeeze(0).detach()
                 stacked_news.append(batch_emb)
         news_emb = torch.cat(stacked_news, dim=0).cpu().numpy()   
 
@@ -341,7 +340,7 @@ def load_data(cfg, mode='train', model=None, local_rank=0):
 
             if mode == 'val':
                 dataset = ValidGraphDataset(
-                    filename=Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_{local_rank}.tsv",
+                    filename=Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_0.tsv",
                     news_index=news_index,
                     news_input=news_emb,
                     local_rank=local_rank,
@@ -357,7 +356,7 @@ def load_data(cfg, mode='train', model=None, local_rank=0):
         else:
             if mode == 'val':
                 dataset = ValidDataset(
-                    filename=Path(data_dir[mode]) / f"behaviors_{local_rank}.tsv",
+                    filename=Path(data_dir[mode]) / f"behaviors_0.tsv",
                     news_index=news_index,
                     news_emb=news_emb,
                     local_rank=local_rank,

@@ -29,44 +29,6 @@ class RecMetrics(BaseModel):
     mrr: float
 
 
-class RecEvaluator:
-    """Implementation of evaluation metrics calculation. The evaluation metrics used are based on Wu et al.'s approach
-    ref: https://aclanthology.org/2020.acl-main.331.pdf
-    """
-
-    @classmethod
-    def evaluate_all(cls, y_true: np.ndarray, y_score: np.ndarray) -> RecMetrics:
-        return RecMetrics(
-            **{
-                "ndcg_at_10": cls.ndcg_score(y_true, y_score, 10),
-                "ndcg_at_5": cls.ndcg_score(y_true, y_score, 5),
-                "auc": roc_auc_score(y_true, y_score),
-                "mrr": cls.mrr_score(y_true, y_score),
-            }
-        )
-
-    @classmethod
-    def dcg_score(cls, y_true: np.ndarray, y_score: np.ndarray, K: int = 5) -> float:
-        discounts = np.log2(np.arange(len(y_true)) + 2)[:K]
-
-        y_score_rank = np.argsort(y_score)[::-1]
-        top_kth_y_true = np.take(y_true, y_score_rank)[:K]
-        gains = 2**top_kth_y_true - 1
-
-        return np.sum(gains / discounts)
-
-    @classmethod
-    def ndcg_score(cls, y_true: np.ndarray, y_score: np.ndarray, K: int = 5) -> float:
-        best = cls.dcg_score(y_true, y_true, K)
-        actual = cls.dcg_score(y_true, y_score, K)
-        return actual / best
-
-    @classmethod
-    def mrr_score(cls, y_true: np.ndarray, y_score: np.ndarray) -> float:
-        y_score_rank = np.argsort(y_score)[::-1]
-        y_true_sorted_by_y_score = np.take(y_true, y_score_rank)
-        rr_score = y_true_sorted_by_y_score / np.arange(1, len(y_true) + 1)
-        return np.sum(rr_score) / np.sum(y_true)
 
 def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
     embedding_matrix = np.zeros(shape=(len(target_dict) + 1, target_dim))
@@ -106,3 +68,45 @@ def load_model(cfg):
     model = framework(cfg, glove_emb=glove_emb, entity_emb=entity_emb)
 
     return model
+
+
+def save_model(cfg, model, optimizer=None, mark=None):
+    file_path = Path(f"{cfg.model_name}.pth")
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    torch.save(
+        {
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict() if optimizer is not None else None,
+        },
+        file_path)
+    print(f"Model Saved. Path = {file_path}")
+
+
+class EarlyStopping:
+    """
+    Early Stopping class
+    """
+
+    def __init__(self, patience=3):
+        self.patience = patience
+        self.counter = 0
+        self.best_score = 0.0
+
+    def __call__(self, score):
+        """
+        The greater score, the better result. Be careful the symbol.
+        """
+        if score > self.best_score:
+            early_stop = False
+            get_better = True
+            self.counter = 0
+            self.best_score = score
+        else:
+            get_better = False
+            self.counter += 1
+            if self.counter >= self.patience:
+                early_stop = True
+            else:
+                early_stop = False
+
+        return early_stop, get_better

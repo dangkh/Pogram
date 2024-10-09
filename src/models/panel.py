@@ -137,7 +137,7 @@ class GLORY(nn.Module):
         cand_final_emb = self.candidate_encoder(candidate_emb.unsqueeze(0), cand_origin_entity_emb, cand_neighbor_entity_emb)
         # ---------------------------------------------------------------------------------------
         # ----------------------------------------- Score ------------------------------------
-        scores = self.click_predictor(cand_final_emb, user_emb).view(-1).cpu().tolist()
+        scores = self.click_predictor(cand_final_emb, user_emb).view(-1).detach().cpu().tolist()
 
         return scores
         
