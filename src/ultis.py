@@ -6,6 +6,7 @@ from typing import Callable
 import logging
 from pydantic import BaseModel
 from sklearn.metrics import roc_auc_score
+from model import *
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -66,3 +67,19 @@ class RecEvaluator:
         return np.sum(rr_score) / np.sum(y_true)
 
 
+def load_model(cfg):
+    stop
+    # framework = getattr(importlib.import_module(f"models.{cfg.model.model_name}"), cfg.model.model_name)
+
+    # if cfg.use_entity:
+    #     entity_dict = pickle.load(open(Path(cfg.dataset.val_dir) / "entity_dict.bin", "rb"))
+    #     entity_emb_path = Path(cfg.dataset.val_dir) / "combined_entity_embedding.vec"
+    #     entity_emb = load_pretrain_emb(entity_emb_path, entity_dict, 100)
+    # else:
+    #     entity_emb = None
+
+    #     word_dict = pickle.load(open(Path(cfg.dataset.train_dir) / "word_dict.bin", "rb"))
+    #     glove_emb = load_pretrain_emb(cfg.path.glove_path, word_dict, cfg.model.word_emb_dim)
+    # model = framework(cfg, glove_emb=glove_emb, entity_emb=entity_emb)
+
+    return model

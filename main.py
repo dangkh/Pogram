@@ -15,18 +15,19 @@ def train( cfg ) -> None:
     """
     logging.info("Prepare the dataset")
     prepare_preprocessed_data(cfg)
-    # hidden_size: int = AutoConfig.from_pretrained(pretrained).hidden_size
-    # loss_fn = nn.CrossEntropyLoss()
-    # transform_fn = create_transform_fn_from_pretrained_tokenizer(AutoTokenizer.from_pretrained(pretrained), max_len)
 
     # """
     # 1. Init Model
     # """
-    # logging.info("Initialize Model")
+    logging.info("Initialize Model")
     # news_encoder = PLMBasedNewsEncoder(pretrained)
     # user_encoder = UserEncoder(hidden_size=hidden_size)
     # nrms_net = NRMS(news_encoder=news_encoder, user_encoder=user_encoder, hidden_size=hidden_size, loss_fn=loss_fn).to(
     #     device, dtype=torch.bfloat16)
+
+    model = load_model(cfg.model_name).to(device)
+    optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
+
 
     """
     2. Load Data & Create Dataset

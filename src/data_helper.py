@@ -207,6 +207,214 @@ def prepare_preprocess_bin(cfg, mode):
     else:
         print(f'[{mode}] All preprocessed files exist.')    
 
+def prepare_news_graph(cfg, mode='train'):
+    data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir + '_test'}
+
+    nltk_target_path = Path(os.path.join(cfg.data_dir + f'_{mode}', "nltk_news_graph.pt"))
+
+    reprocess_flag = False
+    if nltk_target_path.exists() is False:
+        reprocess_flag = True
+        
+    if (reprocess_flag == False) and (cfg.reprocess == False):
+        print(f"[{mode}] All graphs exist !")
+        return
+    
+    # -----------------------------------------News Graph------------------------------------------------
+    behavior_path = Path(data_dir['train']) / "behaviors.tsv"
+    origin_graph_path = Path(data_dir['train']) / "nltk_news_graph.pt"
+
+    news_dict = pickle.load(open(Path(data_dir[mode]) / "news_dict.bin", "rb"))
+    nltk_token_news = pickle.load(open(Path(data_dir[mode]) / "nltk_token_news.bin", "rb"))
+    
+    # ------------------- Build Graph -------------------------------
+    if mode == 'train':
+        edge_list, user_set = [], set()
+        num_line = len(open(behavior_path, encoding='utf-8').readlines())
+        with open(behavior_path, 'r', encoding='utf-8') as f:
+            for line in tqdm(f, total=num_line, desc=f"[{mode}] Processing behaviors news to News Graph"):
+                line = line.strip().split('\t')
+
+                # check duplicate user
+                used_id = line[1]
+                if used_id in user_set:
+                    continue
+                else:
+                    user_set.add(used_id)
+
+                # record cnt & read path
+                history = line[3].split()
+                if len(history) > 1:
+                    long_edge = [news_dict[news_id] for news_id in history]
+                    edge_list.append(long_edge)
+
+        # edge count
+        node_feat = nltk_token_news
+        target_path = nltk_target_path
+        num_nodes = len(news_dict) + 1
+
+        short_edges = []
+        for edge in tqdm(edge_list, total=len(edge_list), desc=f"Processing news edge list"):
+            # Trajectory Graph
+            if cfg.use_graph_type == 0:
+                for i in range(len(edge) - 1):
+                    short_edges.append((edge[i], edge[i + 1]))
+                    # short_edges.append((edge[i + 1], edge[i]))
+            elif cfg.use_graph_type == 1:
+                # Co-occurence Graph fully connecting
+                for i in range(len(edge) - 1):
+                    for j in range(i+1, len(edge)):
+                        short_edges.append((edge[i], edge[j]))
+                        short_edges.append((edge[j], edge[i]))
+            else:
+                assert False, "Wrong"
+
+        edge_weights = Counter(short_edges)
+        unique_edges = list(edge_weights.keys())
+
+        edge_index = torch.tensor(list(zip(*unique_edges)), dtype=torch.long)
+        edge_attr = torch.tensor([edge_weights[edge] for edge in unique_edges], dtype=torch.long)
+
+        data = Data(x=torch.from_numpy(node_feat),
+                edge_index=edge_index, edge_attr=edge_attr,
+                num_nodes=num_nodes)
+    
+        torch.save(data, target_path)
+        print(data)
+        print(f"[{mode}] Finish News Graph Construction, \nGraph Path: {target_path} \nGraph Info: {data}")
+    
+    elif mode in ['test', 'val']:
+        origin_graph = torch.load(origin_graph_path)
+        edge_index = origin_graph.edge_index
+        edge_attr = origin_graph.edge_attr
+        node_feat = nltk_token_news
+
+        data = Data(x=torch.from_numpy(node_feat),
+                    edge_index=edge_index, edge_attr=edge_attr,
+                    num_nodes=len(news_dict) + 1)
+        
+        torch.save(data, nltk_target_path)
+        print(f"[{mode}] Finish nltk News Graph Construction, \nGraph Path: {nltk_target_path}\nGraph Info: {data}")
+
+def prepare_neighbor_list(cfg, mode='train', target='news'):
+    #--------------------------------Neighbors List-------------------------------------------
+    print(f"[{mode}] Start to process neighbors list")
+
+    data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}
+
+    neighbor_dict_path = Path(data_dir[mode] ) / f"{target}_neighbor_dict.bin"
+    weights_dict_path = Path(data_dir[mode] ) / f"{target}_weights_dict.bin"
+    reprocess_flag = False
+    for file_path in [neighbor_dict_path, weights_dict_path]:
+        if file_path.exists() is False:
+            reprocess_flag = True
+        
+    if (reprocess_flag == False) and (cfg.reprocess == False) and (cfg.reprocess_neighbors == False):
+        print(f"[{mode}] All {target} Neighbor dict exist !")
+        return
+
+    if target == 'news':
+        target_graph_path = Path(data_dir[mode] ) / "nltk_news_graph.pt"
+        target_dict = pickle.load(open(Path(data_dir[mode] ) / "news_dict.bin", "rb"))
+        graph_data = torch.load(target_graph_path)
+    elif target == 'entity':
+        target_graph_path = Path(data_dir[mode] ) / "entity_graph.pt"
+        target_dict = pickle.load(open(Path(data_dir[mode]) / "entity_dict.bin", "rb"))
+        graph_data = torch.load(target_graph_path)
+    else:
+        assert False, f"[{mode}] Wrong target {target} "
+
+    edge_index = graph_data.edge_index
+    edge_attr = graph_data.edge_attr
+
+    if cfg.directed is False:
+        edge_index, edge_attr = to_undirected(edge_index, edge_attr)
+
+    neighbor_dict = collections.defaultdict(list)
+    neighbor_weights_dict = collections.defaultdict(list)
+    
+    # for each node (except 0)
+    for i in range(1, len(target_dict)+1):
+        dst_edges = torch.where(edge_index[1] == i)[0]          # i as dst
+        neighbor_weights = edge_attr[dst_edges]
+        neighbor_nodes = edge_index[0][dst_edges]               # neighbors as src
+        sorted_weights, indices = torch.sort(neighbor_weights, descending=True)
+        neighbor_dict[i] = neighbor_nodes[indices].tolist()
+        neighbor_weights_dict[i] = sorted_weights.tolist()
+    
+    pickle.dump(neighbor_dict, open(neighbor_dict_path, "wb"))
+    pickle.dump(neighbor_weights_dict, open(weights_dict_path, "wb"))
+    print(f"[{mode}] Finish {target} Neighbor dict \nDict Path: {neighbor_dict_path}, \nWeight Dict: {weights_dict_path}")
+
+
+def prepare_entity_graph(cfg, mode='train'):
+    data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}
+
+    target_path = Path(data_dir[mode]) / "entity_graph.pt"
+    reprocess_flag = False
+    if target_path.exists() is False:
+        reprocess_flag = True
+    if (reprocess_flag == False) and (cfg.reprocess == False) and (cfg.reprocess_neighbors == False):
+        print(f"[{mode}] Entity graph exists!")
+        return
+
+    entity_dict = pickle.load(open(Path(data_dir[mode]) / "entity_dict.bin", "rb"))
+    origin_graph_path = Path(data_dir['train']) / "entity_graph.pt"
+
+    if mode == 'train':
+        target_news_graph_path = Path(data_dir[mode]) / "nltk_news_graph.pt"
+        news_graph = torch.load(target_news_graph_path)
+        print("news_graph,", news_graph)
+        entity_indices = news_graph.x[:, -8:-3].numpy()
+        print("entity_indices, ", entity_indices.shape)
+
+        entity_edge_index = []
+        # -------- Inter-news -----------------
+        # for entity_idx in entity_indices:
+        #     entity_idx = entity_idx[entity_idx > 0]
+        #     edges = list(itertools.combinations(entity_idx, r=2))
+        #     entity_edge_index.extend(edges)
+
+        news_edge_src, news_edge_dest = news_graph.edge_index
+        edge_weights = news_graph.edge_attr.long().tolist()
+        for i in range(news_edge_src.shape[0]):
+            src_entities = entity_indices[news_edge_src[i]]
+            dest_entities = entity_indices[news_edge_dest[i]]
+            src_entities_mask = src_entities > 0
+            dest_entities_mask = dest_entities > 0
+            src_entities = src_entities[src_entities_mask]
+            dest_entities = dest_entities[dest_entities_mask]
+            edges = list(itertools.product(src_entities, dest_entities)) * edge_weights[i]
+            entity_edge_index.extend(edges)
+
+        edge_weights = Counter(entity_edge_index)
+        unique_edges = list(edge_weights.keys())
+
+        edge_index = torch.tensor(list(zip(*unique_edges)), dtype=torch.long)
+        edge_attr = torch.tensor([edge_weights[edge] for edge in unique_edges], dtype=torch.long)
+
+        # --- Entity Graph Undirected
+        edge_index, edge_attr = to_undirected(edge_index, edge_attr)
+
+        data = Data(x=torch.arange(len(entity_dict) + 1),
+                    edge_index=edge_index,
+                    edge_attr=edge_attr,
+                    num_nodes=len(entity_dict) + 1)
+            
+        torch.save(data, target_path)
+        print(f"[{mode}] Finish Entity Graph Construction, \n Graph Path: {target_path} \nGraph Info: {data}")
+    elif mode in ['val', 'test']:
+        origin_graph = torch.load(origin_graph_path)
+        edge_index = origin_graph.edge_index
+        edge_attr = origin_graph.edge_attr
+
+        data = Data(x=torch.arange(len(entity_dict) + 1),
+                    edge_index=edge_index, edge_attr=edge_attr,
+                    num_nodes=len(entity_dict) + 1)
+        
+        torch.save(data, target_path)
+        print(f"[{mode}] Finish Entity Graph Construction, \n Graph Path: {target_path} \nGraph Info: {data}")    
+
 def prepare_preprocessed_data(cfg)  -> None:
     prepare_distributed_data(cfg, "train")
     prepare_distributed_data(cfg, "val")
@@ -215,20 +423,20 @@ def prepare_preprocessed_data(cfg)  -> None:
     prepare_preprocess_bin(cfg, "val")
     # prepare_preprocess_bin(cfg, "test")
 
-    # prepare_news_graph(cfg, 'train')
-    # prepare_news_graph(cfg, 'val')
+    prepare_news_graph(cfg, 'train')
+    prepare_news_graph(cfg, 'val')
     # prepare_news_graph(cfg, 'test')
 
-    # prepare_neighbor_list(cfg, 'train', 'news')
-    # prepare_neighbor_list(cfg, 'val', 'news')
+    prepare_neighbor_list(cfg, 'train', 'news')
+    prepare_neighbor_list(cfg, 'val', 'news')
     # prepare_neighbor_list(cfg, 'test', 'news')
 
-    # prepare_entity_graph(cfg, 'train')
-    # prepare_entity_graph(cfg, 'val')
+    prepare_entity_graph(cfg, 'train')
+    prepare_entity_graph(cfg, 'val')
     # prepare_entity_graph(cfg, 'test')
 
-    # prepare_neighbor_list(cfg, 'train', 'entity')
-    # prepare_neighbor_list(cfg, 'val', 'entity')
+    prepare_neighbor_list(cfg, 'train', 'entity')
+    prepare_neighbor_list(cfg, 'val', 'entity')
     # prepare_neighbor_list(cfg, 'test', 'entity')
 
     # # Entity vec process
