@@ -64,3 +64,5 @@ class RecEvaluator:
         y_true_sorted_by_y_score = np.take(y_true, y_score_rank)
         rr_score = y_true_sorted_by_y_score / np.arange(1, len(y_true) + 1)
         return np.sum(rr_score) / np.sum(y_true)
+
+

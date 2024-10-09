@@ -3,23 +3,18 @@ import numpy as np
 from torch import nn
 from src.config import TrainConfig 
 from src.ultis import *
+from src.data_helper import prepare_preprocessed_data
 
+device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def train(
-    npratio: int,
-    history_size: int,
-    batch_size: int,
-    gradient_accumulation_steps: int,
-    epochs: int,
-    learning_rate: float,
-    weight_decay: float,
-    max_len: int,
-    device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu"),
-) -> None:
+def train( cfg ) -> None:
     logging.info("Start")
     """
     0. Definite Parameters & Functions
+    
     """
+    logging.info("Prepare the dataset")
+    prepare_preprocessed_data(cfg)
     # hidden_size: int = AutoConfig.from_pretrained(pretrained).hidden_size
     # loss_fn = nn.CrossEntropyLoss()
     # transform_fn = create_transform_fn_from_pretrained_tokenizer(AutoTokenizer.from_pretrained(pretrained), max_len)
@@ -62,20 +57,13 @@ def train(
 
 
 def main(cfg: TrainConfig) -> None:
-    try:
-        set_random_seed(cfg.random_seed)
-        train(
-            cfg.npratio,
-            cfg.history_size,
-            cfg.batch_size,
-            cfg.gradient_accumulation_steps,
-            cfg.epochs,
-            cfg.learning_rate,
-            cfg.weight_decay,
-            cfg.max_len,
-        )
-    except Exception as e:
-        logging.error(e)
+	set_random_seed(cfg.random_seed)
+	train(cfg)
+    # try:
+    #     set_random_seed(cfg.random_seed)
+    #     train(cfg)
+    # except Exception as e:
+    #     logging.error(e)
 
 if __name__ == "__main__":
     main(TrainConfig)
