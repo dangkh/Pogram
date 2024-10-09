@@ -2,13 +2,13 @@ import torch
 import torch.nn as nn
 from torch_geometric.nn import Sequential, GatedGraphConv
 
-from models.base.layers import *
-from models.component.candidate_encoder import *
-from models.component.click_encoder import ClickEncoder
-from models.component.entity_encoder import EntityEncoder, GlobalEntityEncoder
-from models.component.nce_loss import NCELoss
-from models.component.news_encoder import *
-from models.component.user_encoder import *
+from .base.layers import *
+from .component.candidate_encoder import *
+from .component.click_encoder import ClickEncoder
+from .component.entity_encoder import EntityEncoder, GlobalEntityEncoder
+from .component.nce_loss import NCELoss
+from .component.news_encoder import *
+from .component.user_encoder import *
 
 
 class GLORY(nn.Module):
@@ -16,10 +16,10 @@ class GLORY(nn.Module):
         super().__init__()
 
         self.cfg = cfg
-        self.use_entity = cfg.model.use_entity
+        self.use_entity = cfg.use_entity
 
-        self.news_dim =  cfg.model.head_num * cfg.model.head_dim
-        self.entity_dim = cfg.model.entity_emb_dim
+        self.news_dim =  cfg.head_num * cfg.head_dim
+        self.entity_dim = cfg.entity_emb_dim
 
         # -------------------------- Model --------------------------
         # News Encoder
@@ -86,7 +86,7 @@ class GLORY(nn.Module):
         # ----------------------------------------- Candidate------------------------------------
         cand_title_emb = self.local_news_encoder(candidate_news)                                      # [8, 5, 400]
         if self.use_entity:
-            origin_entity, neighbor_entity = candidate_entity.split([self.cfg.model.entity_size,  self.cfg.model.entity_size * self.cfg.model.entity_neighbors], dim=-1)
+            origin_entity, neighbor_entity = candidate_entity.split([self.cfg.entity_size,  self.cfg.entity_size * self.cfg.entity_neighbors], dim=-1)
 
             cand_origin_entity_emb = self.local_entity_encoder(origin_entity, None)
             cand_neighbor_entity_emb = self.global_entity_encoder(neighbor_entity, entity_mask)
@@ -125,7 +125,7 @@ class GLORY(nn.Module):
         if self.use_entity:
             cand_entity_input = candidate_entity.unsqueeze(0)
             entity_mask = entity_mask.unsqueeze(0)
-            origin_entity, neighbor_entity = cand_entity_input.split([self.cfg.model.entity_size,  self.cfg.model.entity_size * self.cfg.model.entity_neighbors], dim=-1)
+            origin_entity, neighbor_entity = cand_entity_input.split([self.cfg.entity_size,  self.cfg.entity_size * self.cfg.entity_neighbors], dim=-1)
 
             cand_origin_entity_emb = self.local_entity_encoder(origin_entity, None)
             cand_neighbor_entity_emb = self.global_entity_encoder(neighbor_entity, entity_mask)

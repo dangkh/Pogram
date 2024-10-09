@@ -440,13 +440,25 @@ def prepare_preprocessed_data(cfg)  -> None:
     # prepare_neighbor_list(cfg, 'test', 'entity')
 
     # # Entity vec process
-    # data_dir = {"train":cfg.dataset.train_dir, "val":cfg.dataset.val_dir, "test":cfg.dataset.test_dir}
-    # train_entity_emb_path = Path(data_dir['train']) / "entity_embedding.vec"
-    # val_entity_emb_path = Path(data_dir['val']) / "entity_embedding.vec"
+    data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}
+
+    train_entity_emb_path = Path(data_dir['train']) / "entity_embedding.vec"
+    val_entity_emb_path = Path(data_dir['val']) / "entity_embedding.vec"
     # test_entity_emb_path = Path(data_dir['test']) / "entity_embedding.vec"
 
-    # val_combined_path = Path(data_dir['val']) / "combined_entity_embedding.vec"
+    val_combined_path = Path(data_dir['val']) / "combined_entity_embedding.vec"
     # test_combined_path = Path(data_dir['test']) / "combined_entity_embedding.vec"
 
-    # os.system("cat " + f"{train_entity_emb_path} {val_entity_emb_path}" + f" > {val_combined_path}")
-    # os.system("cat " + f"{train_entity_emb_path} {test_entity_emb_path}" + f" > {test_combined_path}")
+    # Open the first file and read the contents
+    with open(train_entity_emb_path, 'r') as file1:
+        file1_content = file1.readlines()
+
+    # Open the second file and read the contents
+    with open(val_entity_emb_path, 'r') as file2:
+        file2_content = file2.readlines()
+
+    merged_content = file1_content + file2_content
+
+    # Write the concatenated content to the output file
+    with open(val_combined_path, 'w') as output_file:
+        output_file.writelines(merged_content)

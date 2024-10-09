@@ -6,7 +6,9 @@ from typing import Callable
 import logging
 from pydantic import BaseModel
 from sklearn.metrics import roc_auc_score
-from model import *
+import src.models.panel as panel
+import pickle
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
@@ -66,20 +68,41 @@ class RecEvaluator:
         rr_score = y_true_sorted_by_y_score / np.arange(1, len(y_true) + 1)
         return np.sum(rr_score) / np.sum(y_true)
 
+def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
+    embedding_matrix = np.zeros(shape=(len(target_dict) + 1, target_dim))
+    have_item = []
+    if embedding_file_path is not None:
+        with open(embedding_file_path, 'rb') as f:
+            while True:
+                line = f.readline()
+                if len(line) == 0:
+                    break
+                line = line.split()
+                itme = line[0].decode()
+                if itme in target_dict:
+                    index = target_dict[itme]
+                    tp = [float(x) for x in line[1:]]
+                    embedding_matrix[index] = np.array(tp)
+                    have_item.append(itme)
+    print('-----------------------------------------------------')
+    print(f'Dict length: {len(target_dict)}')
+    print(f'Have words: {len(have_item)}')
+    miss_rate = (len(target_dict) - len(have_item)) / len(target_dict) if len(target_dict) != 0 else 0
+    print(f'Missing rate: {miss_rate}')
+    return embedding_matrix
 
 def load_model(cfg):
-    stop
-    # framework = getattr(importlib.import_module(f"models.{cfg.model.model_name}"), cfg.model.model_name)
+    framework = getattr(panel, cfg.model_name)
 
-    # if cfg.use_entity:
-    #     entity_dict = pickle.load(open(Path(cfg.dataset.val_dir) / "entity_dict.bin", "rb"))
-    #     entity_emb_path = Path(cfg.dataset.val_dir) / "combined_entity_embedding.vec"
-    #     entity_emb = load_pretrain_emb(entity_emb_path, entity_dict, 100)
-    # else:
-    #     entity_emb = None
+    if cfg.use_entity:
+        entity_dict = pickle.load(open(Path(cfg.data_dir + '_val') / "entity_dict.bin", "rb"))
+        entity_emb_path = Path(cfg.data_dir + '_val') / "combined_entity_embedding.vec"
+        entity_emb = load_pretrain_emb(entity_emb_path, entity_dict, 100)
+    else:
+        entity_emb = None
 
-    #     word_dict = pickle.load(open(Path(cfg.dataset.train_dir) / "word_dict.bin", "rb"))
-    #     glove_emb = load_pretrain_emb(cfg.path.glove_path, word_dict, cfg.model.word_emb_dim)
-    # model = framework(cfg, glove_emb=glove_emb, entity_emb=entity_emb)
+    word_dict = pickle.load(open(Path(cfg.data_dir + '_train') / "word_dict.bin", "rb"))
+    glove_emb = load_pretrain_emb(cfg.glove_path, word_dict, cfg.word_emb_dim)
+    model = framework(cfg, glove_emb=glove_emb, entity_emb=entity_emb)
 
     return model
