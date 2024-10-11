@@ -252,7 +252,10 @@ class NewsDataset(Dataset):
         return self.data.shape[0]
 
 
-
+# news_dict = {news_id: str, news_id: int}
+# nltk_token_news = {news_id: int, news_feature: list} news_feature = [tokenized title, category, subcate, newsid, entities]
+# news_graph = [edge: pair, edge_index: list keys_pair, edge_attr: list edge_weight]
+# news_neighbors_dict
 def load_data(cfg, mode='train', model=None, local_rank=0):
     data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}
 
@@ -269,7 +272,6 @@ def load_data(cfg, mode='train', model=None, local_rank=0):
             if cfg.directed is False:
                 news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
             print(f"[{mode}] News Graph Info: {news_graph}")
-
 
             news_neighbors_dict = pickle.load(open(Path(data_dir[mode]) / "news_neighbor_dict.bin", "rb"))
 
@@ -290,7 +292,7 @@ def load_data(cfg, mode='train', model=None, local_rank=0):
                 news_graph=news_graph,
                 entity_neighbors=entity_neighbors
             )
-            dataloader = DataLoader(dataset, batch_size=None)
+            dataloader = DataLoader(dataset, batch_size=int(cfg.batch_size / cfg.gpu_num))
             
         else:
             dataset = TrainDataset(

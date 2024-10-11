@@ -102,9 +102,15 @@ def executor(cfg) -> None:
     logging.info("Prepare the dataset")
     prepare_preprocessed_data(cfg)
 
-    # """
-    # 1. Init Model
-    # """
+    """
+    1. Load Data & Create Dataset
+    """
+    train_dataloader = load_data(cfg, mode='train', local_rank=device)
+
+    # stop
+    """
+    2. Init Model
+    """
     logging.info("Initialize Model")
     model = load_model(cfg).to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.learning_rate)
@@ -112,12 +118,7 @@ def executor(cfg) -> None:
     logging.info(f"NUMBER parameters: {count_parameters(model)}")
     early_stopping = EarlyStopping(cfg.early_stop_patience)
 
-
-    """
-    2. Load Data & Create Dataset
-    """
-    train_dataloader = load_data(cfg, mode='train', local_rank=device)
-
+    stop
     """
     3. Train
     """
