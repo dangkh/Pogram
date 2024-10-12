@@ -60,7 +60,6 @@ def load_model(cfg):
         entity_dict = pickle.load(open(Path(cfg.data_dir + '_val') / "entity_dict.bin", "rb"))
         entity_emb_path = Path(cfg.data_dir + '_val') / "combined_entity_embedding.vec"
         entity_emb = load_pretrain_emb(entity_emb_path, entity_dict, 100)
-        stop
     else:
         entity_emb = None
 

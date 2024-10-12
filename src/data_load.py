@@ -292,7 +292,7 @@ def load_data(cfg, mode='train', model=None, local_rank=0):
                 news_graph=news_graph,
                 entity_neighbors=entity_neighbors
             )
-            dataloader = DataLoader(dataset, batch_size=int(cfg.batch_size / cfg.gpu_num))
+            dataloader = DataLoader(dataset, batch_size=None)
             
         else:
             dataset = TrainDataset(

@@ -118,7 +118,7 @@ def executor(cfg) -> None:
     logging.info(f"NUMBER parameters: {count_parameters(model)}")
     early_stopping = EarlyStopping(cfg.early_stop_patience)
 
-    stop
+    # stop
     """
     3. Train
     """
