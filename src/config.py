@@ -15,7 +15,7 @@ class TrainConfig:
     reprocess_neighbors : bool = False
     data_dir: str = "./data/MINDsmall"
     gpu_num: int = 1
-    title_size: int = 30
+    title_size: int = 20
     abstract_size: int = 50
     entity_size: int = 5
     use_graph_type: int = 0 # adjacency connect or fully connect, fully set = 1

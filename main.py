@@ -101,7 +101,7 @@ def executor(cfg) -> None:
     """
     logging.info("Prepare the dataset")
     prepare_preprocessed_data(cfg)
-
+    return
     """
     1. Load Data & Create Dataset
     """
