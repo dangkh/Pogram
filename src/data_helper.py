@@ -170,7 +170,7 @@ def read_raw_news(cfg, file_path, mode='train'):
                 word_cnt.update(tokens)
 
         if mode == 'train':
-            word = [k for k, v in word_cnt.items() if v > 0]
+            word = [k for k, v in word_cnt.items() if v > 3]
             word_dict = {k: v for k, v in zip(word, range(1, len(word) + 1))}
             return news, news_dict, category_dict, subcategory_dict, entity_dict, word_dict
         else:  # val, test

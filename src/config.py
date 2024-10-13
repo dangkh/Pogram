@@ -2,17 +2,17 @@ from dataclasses import dataclass
 
 @dataclass
 class TrainConfig:
-    random_seed: int = 42
+    random_seed: int = 1009
     npratio: int = 4
-    history_size: int = 50
+    history_size: int = 100
     batch_size: int = 32
     gradient_accumulation_steps: int = 8  # batch_size = 16 x 8 = 128
     epochs: int = 5
     learning_rate: float = 1e-4
     weight_decay: float = 1e-5
     max_len: int = 100
-    reprocess: bool = False
-    reprocess_neighbors : bool = False
+    reprocess: bool = True
+    reprocess_neighbors : bool = True
     data_dir: str = "./data/MINDsmall"
     gpu_num: int = 1
     title_size: int = 20
@@ -30,7 +30,7 @@ class TrainConfig:
     entity_neighbors = 10
     attention_hidden_dim = 200
     dropout_probability = 0.2
-    his_size = 50
+    his_size = 100
     k_hops = 2
     num_neighbors = 8
     use_graph = True
