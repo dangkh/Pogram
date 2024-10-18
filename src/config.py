@@ -11,8 +11,8 @@ class TrainConfig:
     learning_rate: float = 1e-4
     weight_decay: float = 1e-5
     max_len: int = 100
-    reprocess: bool = False
-    reprocess_neighbors : bool = False
+    reprocess: bool = True
+    reprocess_neighbors : bool = True
     data_dir: str = "./data/MINDsmall"
     gpu_num: int = 1
     title_size: int = 20
@@ -30,7 +30,7 @@ class TrainConfig:
     entity_neighbors = 10
     attention_hidden_dim = 200
     dropout_probability = 0.2
-    his_size = 50
+    his_size = 100
     k_hops = 1
     num_neighbors = 8
     use_graph = True
