@@ -2,3 +2,9 @@
 /data
 *.pyc
 *.pyc
+*.pth
+*.pth
+*.pth
+*.zip
+*.pth
+Graph_naml_model.pth

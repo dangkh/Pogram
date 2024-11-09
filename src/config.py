@@ -30,7 +30,7 @@ class TrainConfig:
     entity_neighbors = 10
     attention_hidden_dim = 200
     dropout_probability = 0.2
-    his_size = 100
+    his_size = 50
     k_hops = 1
     num_neighbors = 8
     use_graph = True
