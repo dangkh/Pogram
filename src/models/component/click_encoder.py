@@ -23,6 +23,7 @@ class ClickEncoder(nn.Module):
     def forward(self, clicke_title_emb, click_graph_emb, click_entity_emb=None):
 
         batch_size, num_news = clicke_title_emb.shape[0], clicke_title_emb.shape[1]
+        print(clicke_title_emb.shape, click_graph_emb.shape)
         if click_entity_emb is not None:
             result = self.atte(clicke_title_emb, click_graph_emb, click_entity_emb)
         else:

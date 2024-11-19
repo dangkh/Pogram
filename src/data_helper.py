@@ -10,7 +10,9 @@ import collections
 from nltk.tokenize import word_tokenize
 from torch_geometric.data import Data
 from torch_geometric.utils import to_undirected
-
+import nltk
+nltk.download('punkt')
+    
 import torch.nn.functional as F
 from tqdm import tqdm
 import random
@@ -102,7 +104,7 @@ def read_parsed_news(cfg, news, news_dict,
                      word_dict=None):
     news_num = len(news) + 1
     news_category, news_subcategory, news_index = [np.zeros((news_num, 1), dtype='int32') for _ in range(3)]
-    # news_entity = np.zeros((news_num, 5), dtype='int32')
+    news_entity = np.zeros((news_num, cfg.entity_size), dtype='int32')
 
     news_title = np.zeros((news_num, cfg.title_size), dtype='int32')
 
@@ -114,21 +116,20 @@ def read_parsed_news(cfg, news, news_dict,
         news_index[_news_index, 0] = news_dict[_news_id]
 
         # entity
-        # entity_index = [entity_dict[entity_id] if entity_id in entity_dict else 0 for entity_id in _entity_ids]
-        # news_entity[_news_index, :min(cfg.entity_size, len(_entity_ids))] = entity_index[:cfg.entity_size]
+        entity_index = [entity_dict[entity_id] if entity_id in entity_dict else 0 for entity_id in _entity_ids]
+        news_entity[_news_index, :min(cfg.entity_size, len(_entity_ids))] = entity_index[:cfg.entity_size]
 
         for _word_id in range(min(cfg.title_size, len(_title))):
             if _title[_word_id] in word_dict:
                 news_title[_news_index, _word_id] = word_dict[_title[_word_id]]
 
     # return news_title, news_entity, news_category, news_subcategory, news_index
-    return news_title, news_category, news_subcategory
+    return news_title, news_category, news_subcategory, news_entity
+    # return news_title, news_category, news_subcategory
 
 
 def read_raw_news(cfg, file_path, mode='train'):
 
-    import nltk
-    nltk.download('punkt')
     data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir + '_test'}
 
     if mode in ['val', 'test']:
@@ -172,8 +173,10 @@ def read_raw_news(cfg, file_path, mode='train'):
         if mode == 'train':
             word = [k for k, v in word_cnt.items() if v > 3]
             word_dict = {k: v for k, v in zip(word, range(1, len(word) + 1))}
+            print(len(entity_dict))
             return news, news_dict, category_dict, subcategory_dict, entity_dict, word_dict
         else:  # val, test
+            print(len(entity_dict))
             return news, news_dict, None, None, entity_dict, None
 
 def prepare_preprocess_bin(cfg, mode):
