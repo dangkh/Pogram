@@ -59,7 +59,8 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 	for cnt, (_, [log_vecs, log_mask, news_vecs, labels]) in tqdm(enumerate(valid_dataloader)):
 		log_vecs = log_vecs.cuda()
 		log_mask = log_mask.cuda()
-		news_vecs = news_vecs.cuda()
+		if cfg.use_entity:
+			news_vecs = news_vecs.cuda()
 		
 
 		e_his = log_vecs[:,:,-5:].int()
@@ -67,22 +68,24 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 		e_candi = news_vecs[:,:,-5:].int()
 		news_vecs = news_vecs[:,:,:-5]
 
-		e_his = model.entity_embedding_layer(e_his)
-		e_candi = model.entity_embedding_layer(e_candi)
-		e_his = model.entity_encoder(e_his, None)
-		e_candi = model.entity_encoder(e_candi, None)
+		if cfg.use_entity:
+			e_his = model.entity_embedding_layer(e_his)
+			e_candi = model.entity_embedding_layer(e_candi)
+			e_his = model.entity_encoder(e_his, None)
+			e_candi = model.entity_encoder(e_candi, None)
 		
-		user_vecs = model.user_att(torch.stack([log_vecs, e_his], dim=2).view(-1, 2, model.news_dim))
-		user_vecs = user_vecs.view(-1, model.user_log_length, model.news_dim)
+			user_vecs = model.user_att(torch.stack([log_vecs, e_his], dim=2).view(-1, 2, model.news_dim))
+			user_vecs = user_vecs.view(-1, model.user_log_length, model.news_dim)
+			news_vecs = model.candi_att(torch.stack([news_vecs, e_candi], dim=2).view(-1, 2, model.news_dim))
+			news_vecs = news_vecs.unsqueeze(0).to(torch.device("cpu")).detach().numpy()
 
-		# user_vecs = log_vecs.view(-1, model.user_log_length, model.news_dim)
+		else:
+			user_vecs = log_vecs.view(-1, model.user_log_length, model.news_dim)
 
 		
 		user_vecs = model.user_encoder(user_vecs, log_mask).to(torch.device("cpu")).detach().numpy()
 		
-		news_vecs = model.candi_att(torch.stack([news_vecs, e_candi], dim=2).view(-1, 2, model.news_dim))
-		news_vecs = news_vecs.unsqueeze(0).to(torch.device("cpu")).detach().numpy()
-
+		
 		# candidate = candidate.view(-1, model.npratio+1, self.news_dim)
 		# (1, 400) torch.Size([1, 22, 400]) (1, 22)
 
