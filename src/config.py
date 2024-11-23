@@ -7,7 +7,7 @@ class TrainConfig:
     history_size: int = 50
     batch_size: int = 32
     gradient_accumulation_steps: int = 8  # batch_size = 16 x 8 = 128
-    epochs: int = 6
+    epochs: int = 5
     learning_rate: float = 1e-4
     weight_decay: float = 1e-5
     max_len: int = 100
@@ -26,7 +26,7 @@ class TrainConfig:
     glove_path = './data/glove.840B.300d.txt'
     word_emb_dim = 300
     head_num = 4
-    head_dim = 25
+    head_dim = 100
     entity_emb_dim = 100
     entity_neighbors = 10
     attention_hidden_dim = 200
@@ -35,4 +35,5 @@ class TrainConfig:
     k_hops = 1
     num_neighbors = 8
     use_graph = True
+    use_entity = True
     early_stop_patience = 5

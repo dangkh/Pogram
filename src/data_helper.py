@@ -456,7 +456,6 @@ def prepare_preprocessed_data(cfg)  -> None:
     # Open the first file and read the contents
     with open(train_entity_emb_path, 'r') as file1:
         file1_content = file1.readlines()
-
     # Open the second file and read the contents
     with open(val_entity_emb_path, 'r') as file2:
         file2_content = file2.readlines()

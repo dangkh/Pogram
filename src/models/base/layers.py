@@ -6,38 +6,20 @@ import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from .function import *
 
-
-class DotProduct(nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def forward(self, left, right):
-        """
-
-        Args:
-            left: (batch_size, num_candidate, dim_embedding)
-            right: (batch_size, dim_embedding)
-
-        Returns:
-            (shape): batch_size, candidate_num
-
-        """
-        result = torch.bmm(left, right.unsqueeze(dim=-1)).squeeze(dim=-1)
-        return result
-
-
 class AttentionPooling(nn.Module):
     def __init__(self, emb_size, hidden_size):
         super(AttentionPooling, self).__init__()
         self.att_fc1 = nn.Linear(emb_size, hidden_size)
         self.att_fc2 = nn.Linear(hidden_size, 1)
 
-    def initialize(self):
-        nn.init.xavier_uniform_(self.att_fc1.weight, gain=nn.init.calculate_gain('tanh'))
-        nn.init.zeros_(self.att_fc1.bias)
-        nn.init.xavier_uniform_(self.att_fc2.weight)
-       
     def forward(self, x, attn_mask=None):
+        """
+        Args:
+            x: batch_size, candidate_size, emb_dim
+            attn_mask: batch_size, candidate_size
+        Returns:
+            (shape) batch_size, emb_dim
+        """
         e = self.att_fc1(x)
         e = nn.Tanh()(e)
         alpha = self.att_fc2(e)
@@ -53,17 +35,17 @@ class AttentionPooling(nn.Module):
 
 class ScaledDotProductAttention(nn.Module):
     def __init__(self, d_k):
-        super().__init__()
+        super(ScaledDotProductAttention, self).__init__()
         self.d_k = d_k
 
     def forward(self, Q, K, V, attn_mask=None):
-        """
+        '''
             Q: batch_size, n_head, candidate_num, d_k
             K: batch_size, n_head, candidate_num, d_k
             V: batch_size, n_head, candidate_num, d_v
             attn_mask: batch_size, n_head, candidate_num
             Return: batch_size, n_head, candidate_num, d_v
-        """
+        '''
         scores = torch.matmul(Q, K.transpose(-1, -2)) / np.sqrt(self.d_k)
         scores = torch.exp(scores)
 
@@ -75,44 +57,41 @@ class ScaledDotProductAttention(nn.Module):
         return context
 
 
-class MultiHeadAttention(nn.Module):
-    def __init__(self, key_size, query_size, value_size, head_num, head_dim, residual=False):
-        super().__init__()
-        self.head_num = head_num
-        self.head_dim = head_dim
-        self.residual = residual
+class MultiHeadSelfAttention(nn.Module):
+    def __init__(self, d_model, n_heads, d_k, d_v):
+        super(MultiHeadSelfAttention, self).__init__()
+        self.d_model = d_model
+        self.n_heads = n_heads
+        self.d_k = d_k
+        self.d_v = d_v
 
-        self.W_Q = nn.Linear(key_size, self.head_dim * self.head_num, bias=True)
-        self.W_K = nn.Linear(query_size, self.head_dim * self.head_num, bias=False)
-        self.W_V = nn.Linear(value_size, self.head_dim * self.head_num, bias=True)
+        self.W_Q = nn.Linear(d_model, d_k * n_heads)
+        self.W_K = nn.Linear(d_model, d_k * n_heads)
+        self.W_V = nn.Linear(d_model, d_v * n_heads)
 
-        self.scaled_dot_product_attn = ScaledDotProductAttention(self.head_dim)
-        self.apply(xavier)
+        self.scaled_dot_product_attn = ScaledDotProductAttention(self.d_k)
+        self._initialize_weights()
 
-    def initialize(self):
-        nn.init.zeros_(self.W_Q.bias)
-        nn.init.zeros_(self.W_V.bias)
-
+    def _initialize_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.xavier_uniform_(m.weight, gain=1)
 
     def forward(self, Q, K, V, mask=None):
-        """
-            Q: batch_size, candidate_num, news_dim
-            K: batch_size, candidate_num, news_dim
-            V: batch_size, candidate_num, news_dim
+        '''
+            Q: batch_size, candidate_num, d_model
+            K: batch_size, candidate_num, d_model
+            V: batch_size, candidate_num, d_model
             mask: batch_size, candidate_num
-        """
+        '''
         batch_size = Q.shape[0]
         if mask is not None:
-            mask = mask.unsqueeze(dim=1).expand(-1, self.head_num, -1)
+            mask = mask.unsqueeze(dim=1).expand(-1, self.n_heads, -1)
 
-        q_s = self.W_Q(Q).view(batch_size, -1, self.head_num, self.head_dim).transpose(1, 2)
-        k_s = self.W_K(K).view(batch_size, -1, self.head_num, self.head_dim).transpose(1, 2)
-        v_s = self.W_V(V).view(batch_size, -1, self.head_num, self.head_dim).transpose(1, 2)
+        q_s = self.W_Q(Q).view(batch_size, -1, self.n_heads, self.d_k).transpose(1, 2)
+        k_s = self.W_K(K).view(batch_size, -1, self.n_heads, self.d_k).transpose(1, 2)
+        v_s = self.W_V(V).view(batch_size, -1, self.n_heads, self.d_v).transpose(1, 2)
 
         context = self.scaled_dot_product_attn(q_s, k_s, v_s, mask)
-        output = context.transpose(1, 2).contiguous().view(batch_size, -1, self.head_num * self.head_dim)
-        if self.residual:
-            output += Q
+        output = context.transpose(1, 2).contiguous().view(batch_size, -1, self.n_heads * self.d_v)
         return output
-
-
