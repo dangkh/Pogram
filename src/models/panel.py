@@ -152,6 +152,7 @@ class NAML(torch.nn.Module):
         self.entity_dim = 100
         self.npratio = 4
         self.user_log_length = 50
+        self.cfg = cfg
         pretrained_word_embedding = torch.from_numpy(embedding_matrix).float()
         word_embedding = nn.Embedding.from_pretrained(pretrained_word_embedding,
                                                       freeze=False,
@@ -180,35 +181,36 @@ class NAML(torch.nn.Module):
         history = history[:,:,:-5]
         e_candi = candidate[:,:,-5:]
         candidate = candidate[:,:,:-5]
-        e_his = self.entity_embedding_layer(e_his)
-        e_candi = self.entity_embedding_layer(e_candi)
-        e_his = self.entity_encoder(e_his, None)
-        e_candi = self.entity_encoder(e_candi, None)
-
         num_words = history.shape[-1]
-        candidate = candidate.reshape(-1, num_words)
-        candidate = self.news_encoder(candidate).reshape(-1, 1 + self.npratio, self.news_dim)
-        candidate = self.candi_att(torch.stack([candidate, e_candi], dim=2).view(-1, 2, self.news_dim))
-        candidate = candidate.view(-1, self.npratio+1, self.news_dim)
-
-        history = history.reshape(-1, num_words)
-        history = self.news_encoder(history).reshape(-1, self.user_log_length, self.news_dim)
-        user_vec = self.user_att(torch.stack([history, e_his], dim=2).view(-1, 2, self.news_dim))
-        user_vec = user_vec.view(-1, self.user_log_length, self.news_dim)
         
-        user_vec = self.user_encoder(user_vec, history_mask)
+        if self.cfg.use_entity:
+            e_his = self.entity_embedding_layer(e_his)
+            e_candi = self.entity_embedding_layer(e_candi)
+            e_his = self.entity_encoder(e_his, None)
+            e_candi = self.entity_encoder(e_candi, None)
+
+            candidate = candidate.reshape(-1, num_words)
+            candidate = self.news_encoder(candidate).reshape(-1, 1 + self.npratio, self.news_dim)
+            candidate = self.candi_att(torch.stack([candidate, e_candi], dim=2).view(-1, 2, self.news_dim))
+            candidate = candidate.view(-1, self.npratio+1, self.news_dim)
+
+            history = history.reshape(-1, num_words)
+            history = self.news_encoder(history).reshape(-1, self.user_log_length, self.news_dim)
+            user_vec = self.user_att(torch.stack([history, e_his], dim=2).view(-1, 2, self.news_dim))
+            user_vec = user_vec.view(-1, self.user_log_length, self.news_dim)
+            
+            user_vec = self.user_encoder(user_vec, history_mask)
+        else:
+       
+            candidate = candidate.reshape(-1, num_words)
+            candidate = self.news_encoder(candidate).reshape(-1, 1 + self.npratio, self.news_dim)
+            history = history.reshape(-1, num_words)
+            history = self.news_encoder(history).reshape(-1, self.user_log_length, self.news_dim)
+            user_vec = self.user_encoder(history, history_mask)
+        
 
         score = torch.bmm(candidate, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
         loss = self.loss_fn(score, label)
-
-        # num_words = history.shape[-1]
-        # candidate_news = candidate.reshape(-1, num_words)
-        # candidate_news_vecs = self.news_encoder(candidate_news).reshape(-1, 1 + self.npratio, self.news_dim)
-        # history_news = history.reshape(-1, num_words)
-        # history_news_vecs = self.news_encoder(history_news).reshape(-1, self.user_log_length, self.news_dim)
-        # user_vec = self.user_encoder(history_news_vecs, history_mask)
-        # score = torch.bmm(candidate_news_vecs, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
-        # loss = self.loss_fn(score, label)
-        
+  
         return loss, score
 

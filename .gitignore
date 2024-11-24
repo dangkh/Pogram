@@ -8,3 +8,4 @@
 *.zip
 *.pth
 Graph_naml_model.pth
+*.pyc
