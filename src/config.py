@@ -36,4 +36,5 @@ class TrainConfig:
     num_neighbors = 8
     use_graph = True
     use_entity = True
+    use_EnrichE = True
     early_stop_patience = 5

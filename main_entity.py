@@ -126,6 +126,7 @@ set_random_seed(cfg.random_seed)
 
 """
 logging.info("Prepare the dataset")
+# if using Enriched Entity, make sure that reprocess setting is True
 prepare_preprocessed_data(cfg)
 train_dataloader = load_dataloaderEntity(cfg, mode='train')
 
