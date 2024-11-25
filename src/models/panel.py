@@ -3,12 +3,9 @@ import torch.nn as nn
 from torch_geometric.nn import Sequential, GatedGraphConv
 
 from .base.layers import *
-from .component.candidate_encoder import *
 from .component.user_encoder import UserEncoder
 from .component.entity_encoder import EntityEncoder
-from .component.nce_loss import NCELoss
 from .component.news_encoder import *
-from .component.user_encoder import *
 
 
 # class GLORY(nn.Module):

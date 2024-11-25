@@ -23,14 +23,6 @@ def set_random_seed(random_seed: int = 42) -> None:
 	torch.backends.cudnn.benchmark = True
 
 
-class RecMetrics(BaseModel):
-	ndcg_at_10: float
-	ndcg_at_5: float
-	auc: float
-	mrr: float
-
-
-
 def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
 	embedding_matrix = np.zeros(shape=(len(target_dict) + 1, target_dim))
 	have_item = []
@@ -54,29 +46,16 @@ def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
 	print(f'Missing rate: {miss_rate}')
 	return embedding_matrix
 
-def load_model(cfg):
-	framework = getattr(panel, cfg.model_name)
 
+def load_modelPanel(cfg):
+	category_dict = pickle.load(open(os.path.join(cfg.data_dir + '_train', "category_dict.bin"), "rb"))
+	subcategory_dict = pickle.load(open(os.path.join(cfg.data_dir + '_train', "subcategory_dict.bin"), "rb"))
 	if cfg.use_entity:
 		entity_dict = pickle.load(open(Path(cfg.data_dir + '_val') / "entity_dict.bin", "rb"))
 		entity_emb_path = Path(cfg.data_dir + '_val') / "combined_entity_embedding.vec"
 		entity_emb = load_pretrain_emb(entity_emb_path, entity_dict, 100)
 	else:
 		entity_emb = None
-
-	word_dict = pickle.load(open(Path(cfg.data_dir + '_train') / "word_dict.bin", "rb"))
-	glove_emb = load_pretrain_emb(cfg.glove_path, word_dict, cfg.word_emb_dim)
-	model = framework(cfg, glove_emb=glove_emb, entity_emb=entity_emb)
-
-	return model
-
-
-def load_modelPanel(cfg):
-	category_dict = pickle.load(open(os.path.join(cfg.data_dir + '_train', "category_dict.bin"), "rb"))
-	subcategory_dict = pickle.load(open(os.path.join(cfg.data_dir + '_train', "subcategory_dict.bin"), "rb"))
-	entity_dict = pickle.load(open(Path(cfg.data_dir + '_val') / "entity_dict.bin", "rb"))
-	entity_emb_path = Path(cfg.data_dir + '_val') / "combined_entity_embedding.vec"
-	entity_emb = load_pretrain_emb(entity_emb_path, entity_dict, 100)
 	word_dict = pickle.load(open(os.path.join(cfg.data_dir + '_train', "word_dict.bin"), "rb"))
 	glove_emb = load_pretrain_emb(cfg.glove_path, word_dict, cfg.word_emb_dim)
 	model = panel.NAML(glove_emb, entity_emb, len(category_dict), len(subcategory_dict), cfg)
