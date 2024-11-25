@@ -1,0 +1,184 @@
+class NAML(torch.nn.Module):
+    def __init__(self, embedding_matrix, num_category, num_subcategory, **kwargs):
+        super(NAML, self).__init__()
+        pretrained_word_embedding = torch.from_numpy(embedding_matrix).float()
+        word_embedding = nn.Embedding.from_pretrained(pretrained_word_embedding,
+                                                      freeze=False,
+                                                      padding_idx=0)
+
+        self.news_encoder = NewsEncoder( word_embedding, num_category, num_subcategory)
+        self.user_encoder = UserEncoder()
+        self.news_dim = 400
+        self.gcn = GCNConv(400,self.news_dim)
+        self.attn = AttentionPooling(self.news_dim, 128)
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.npratio = 4
+        self.user_log_length = 100
+
+    def forward(self, graph_batch, history, history_mask, candidate, label):
+        '''
+            history: batch_size, history_length, num_word_title
+            history_mask: batch_size, history_length
+            candidate: batch_size, 1+K, num_word_title
+            label: batch_size, 1+K
+        '''
+        graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
+        graph_vec = self.news_encoder(graph_vec)
+        graph_vec = self.gcn(graph_vec, edge_index)
+        graph_vec = graph_vec.relu()
+        graph_vec = global_mean_pool(graph_vec, batch)
+        
+        # graph_vec = F.dropout(graph_vec, p=0.2, training=self.training)
+        # graph_vec = self.gln(graph_vec)
+
+        num_words = history.shape[-1]
+        candidate_news = candidate.reshape(-1, num_words)
+        candidate_news_vecs = self.news_encoder(candidate_news).reshape(-1, 1 + self.npratio, self.news_dim)
+
+        
+        history_news = history.reshape(-1, num_words)
+        history_news_vecs = self.news_encoder(history_news).reshape(-1, self.user_log_length, self.news_dim)
+        user_vec = self.user_encoder(history_news_vecs, history_mask)
+
+        
+        # print(graph_vec.shape, user_vec.shape)
+        # stop
+        
+        uservec = torch.stack([user_vec, graph_vec], dim=1)
+        uservec = self.attn(uservec)
+
+        score = torch.bmm(candidate_news_vecs, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
+        loss = self.loss_fn(score, label)
+        return loss, score
+
+
+
+
+-->>> 64.9
+
+class NAML(torch.nn.Module):
+    def __init__(self, embedding_matrix, num_category, num_subcategory, **kwargs):
+        super(NAML, self).__init__()
+        pretrained_word_embedding = torch.from_numpy(embedding_matrix).float()
+        word_embedding = nn.Embedding.from_pretrained(pretrained_word_embedding,
+                                                      freeze=False,
+                                                      padding_idx=0)
+
+        self.news_encoder = NewsEncoder( word_embedding, num_category, num_subcategory)
+        self.user_encoder = UserEncoder()
+        self.news_dim = 400
+        self.gcn = GCNConv(400, 64)
+        self.gln = nn.Linear(64, 400)
+        self.attn = AttentionPooling(self.news_dim, 128)
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.npratio = 4
+        self.user_log_length = 100
+
+    def forward(self, graph_batch, history, history_mask, candidate, label):
+        '''
+            history: batch_size, history_length, num_word_title
+            history_mask: batch_size, history_length
+            candidate: batch_size, 1+K, num_word_title
+            label: batch_size, 1+K
+        '''
+        graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
+        graph_vec = self.news_encoder(graph_vec)
+        graph_vec = self.gcn(graph_vec, edge_index)
+        graph_vec = graph_vec.relu()
+        graph_vec = self.gln(graph_vec)
+        graph_vec = global_mean_pool(graph_vec, batch)
+        
+        # graph_vec = F.dropout(graph_vec, p=0.2, training=self.training)
+        # graph_vec = self.gln(graph_vec)
+
+        num_words = history.shape[-1]
+        candidate_news = candidate.reshape(-1, num_words)
+        candidate_news_vecs = self.news_encoder(candidate_news).reshape(-1, 1 + self.npratio, self.news_dim)
+
+        
+        history_news = history.reshape(-1, num_words)
+        history_news_vecs = self.news_encoder(history_news).reshape(-1, self.user_log_length, self.news_dim)
+        user_vec = self.user_encoder(history_news_vecs, history_mask)
+
+        
+        # print(graph_vec.shape, user_vec.shape)
+        # stop
+        
+        uservec = torch.stack([user_vec, graph_vec], dim=1)
+        uservec = self.attn(uservec)
+
+        score = torch.bmm(candidate_news_vecs, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
+        loss = self.loss_fn(score, label)
+        return loss, score
+
+
+
+--> 64.5 / 67.2
+
+
+class NAML(torch.nn.Module):
+    def __init__(self, embedding_matrix, num_category, num_subcategory, **kwargs):
+        super(NAML, self).__init__()
+        pretrained_word_embedding = torch.from_numpy(embedding_matrix).float()
+        word_embedding = nn.Embedding.from_pretrained(pretrained_word_embedding,
+                                                      freeze=False,
+                                                      padding_idx=0)
+
+        self.news_encoder = NewsEncoder( word_embedding, num_category, num_subcategory)
+        self.user_encoder = UserEncoder()
+        self.news_dim = 400
+        
+        self.gcn = GATv2Conv(400, 32, heads=2, concat=False)
+        self.gln = nn.Linear(32, 400)
+
+        
+        # self.gcn = GCNConv(400, 64)
+
+        
+        self.attn = AttentionPooling(self.news_dim, 128)
+        self.loss_fn = nn.CrossEntropyLoss()
+        self.npratio = 4
+        self.user_log_length = 100
+
+    def forward(self, graph_batch, history, history_mask, candidate, label):
+        '''
+            history: batch_size, history_length, num_word_title
+            history_mask: batch_size, history_length
+            candidate: batch_size, 1+K, num_word_title
+            label: batch_size, 1+K
+        '''
+        graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
+        graph_vec = self.news_encoder(graph_vec)
+        graph_vec = self.gcn(graph_vec, edge_index)
+        graph_vec = graph_vec.relu()
+        graph_vec = self.gln(graph_vec)
+        graph_vec = global_mean_pool(graph_vec, batch)
+        
+        # graph_vec = F.dropout(graph_vec, p=0.2, training=self.training)
+        # graph_vec = self.gln(graph_vec)
+
+        num_words = history.shape[-1]
+        candidate_news = candidate.reshape(-1, num_words)
+        candidate_news_vecs = self.news_encoder(candidate_news).reshape(-1, 1 + self.npratio, self.news_dim)
+
+        
+        history_news = history.reshape(-1, num_words)
+        history_news_vecs = self.news_encoder(history_news).reshape(-1, self.user_log_length, self.news_dim)
+        user_vec = self.user_encoder(history_news_vecs, history_mask)
+
+        
+        # print(graph_vec.shape, user_vec.shape)
+        # stop
+        
+        uservec = torch.stack([user_vec, graph_vec], dim=1)
+        uservec = self.attn(uservec)
+
+        score = torch.bmm(candidate_news_vecs, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
+        loss = self.loss_fn(score, label)
+        return loss, score
+
+--> 65.2 /
+
+
+
+

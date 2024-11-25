@@ -13,55 +13,64 @@ import torch
 import torch.nn as nn
 import numpy as np
 
-
 class NewsEncoder(nn.Module):
-    def __init__(self, cfg, glove_emb=None):
-        super().__init__()
-        token_emb_dim = cfg.word_emb_dim
-        self.news_dim = cfg.head_num * cfg.head_dim
+    def __init__(self, embedding_matrix, num_category, num_subcategory):
+        super(NewsEncoder, self).__init__()
+        self.embedding_matrix = embedding_matrix
+        self.drop_rate = 0.2
+        self.num_words_title = 20
+        self.use_category = True
+        self.use_subcategory = True
+        category_emb_dim = 100
+        news_dim = 400
+        news_query_vector_dim = 200
+        word_embedding_dim = 300
+        self.category_emb = nn.Embedding(num_category + 1, category_emb_dim, padding_idx=0)
+        self.category_dense = nn.Linear(category_emb_dim, news_dim)
+        self.subcategory_emb = nn.Embedding(num_subcategory + 1, category_emb_dim, padding_idx=0)
+        self.subcategory_dense = nn.Linear(category_emb_dim, news_dim)
+        self.final_attn = AttentionPooling(news_dim, news_query_vector_dim)
+        self.cnn = nn.Conv1d(
+            in_channels=word_embedding_dim,
+            out_channels=news_dim,
+            kernel_size=3,
+            padding=1
+        )
+        self.attn = AttentionPooling(news_dim, news_query_vector_dim)
+        self.cln = nn.Linear(300,400)
+        self.lnorm = nn.LayerNorm(news_dim)
+        self.act = nn.LeakyReLU(0.2)
 
-        pretrain = torch.from_numpy(glove_emb).float()
-        self.word_encoder = nn.Embedding.from_pretrained(pretrain, freeze=False, padding_idx=0)
+    def forward(self, x, mask=None):
+        '''
+            x: batch_size, word_num
+            mask: batch_size, word_num
+        '''
+        title = torch.narrow(x, -1, 0, self.num_words_title).long()
+        word_vecs = F.dropout(self.embedding_matrix(title),
+                              p=self.drop_rate,
+                              training=self.training)
+        context_word_vecs = self.cnn(word_vecs.transpose(1, 2)).transpose(1, 2)
+        # context_word_vecs = self.cnn(word_vecs.transpose(1, 2)).transpose(1, 2)
+        # stop
+        title_vecs = self.lnorm(self.attn(context_word_vecs, mask))
+        all_vecs = [title_vecs]
 
-        self.view_size = [cfg.title_size, cfg.abstract_size]
-        
+        start = self.num_words_title
+        if self.use_category:
+            category = torch.narrow(x, -1, start, 1).squeeze(dim=-1).long()
+            category_vecs = self.category_dense(self.category_emb(category))
+            all_vecs.append(category_vecs)
+            start += 1
+        if self.use_subcategory:
+            subcategory = torch.narrow(x, -1, start, 1).squeeze(dim=-1).long()
+            subcategory_vecs = self.subcategory_dense(self.subcategory_emb(subcategory))
+            all_vecs.append(subcategory_vecs)
 
-        self.attention = Sequential('x, mask', [
-            (nn.Dropout(p=cfg.dropout_probability), 'x -> x'),
-            (MultiHeadAttention(token_emb_dim,
-                                token_emb_dim,
-                                token_emb_dim,
-                                cfg.head_num,
-                                cfg.head_dim), 'x,x,x,mask -> x'),
-            nn.LayerNorm(self.news_dim),
-            nn.Dropout(p=cfg.dropout_probability),
-
-            (AttentionPooling(self.news_dim,
-                                cfg.attention_hidden_dim), 'x,mask -> x'),
-            nn.LayerNorm(self.news_dim),
-            # nn.Linear(self.news_dim, self.news_dim),
-            # nn.LeakyReLU(0.2),
-        ])
-
-
-    def forward(self, news_input, mask=None):
-        """
-        Args:
-            news_input:  [batch_size, news_num, total_input]  eg. [64,50,82] [64,50,96]
-            mask:   [batch_size, news_num]
-        Returns:
-            [batch_size, news_num, news_emb] eg. [64,50,400]
-        """
-        batch_size = news_input.shape[0]
-        num_news = news_input.shape[1]
-
-        # [batch_size * news_num, view_size, word_emb_dim]
-        title_input, _, _, _, _ = news_input.split([self.view_size[0], 5, 1, 1, 1], dim=-1)
-
-        title_word_emb = self.word_encoder(title_input.long().view(-1, self.view_size[0]))
-
-        total_word_emb = title_word_emb
-
-        result = self.attention(total_word_emb, mask)
-
-        return result.view(batch_size, num_news, self.news_dim)     # [batch, num_news, news_dim]
+        if len(all_vecs) == 1:
+            news_vecs = all_vecs[0]
+        else:
+            all_vecs = torch.stack(all_vecs, dim=1)
+            
+            news_vecs = self.final_attn(all_vecs)
+        return self.act(news_vecs)
