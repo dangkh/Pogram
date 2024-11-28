@@ -15,7 +15,7 @@ from torch_geometric.utils import subgraph
 from torch_geometric.loader import DataLoader as GraphDataLoader
 
 import random
-
+device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	
 class Panel_TrainDataset(Dataset):
 	def __init__(self, filename, news_index, news_combined, cfg, neighbor_dict, news_graph):
@@ -200,11 +200,15 @@ def load_dataloader(cfg, mode='train', model=None):
 		news_scoring = []
 		with torch.no_grad():
 			for input_ids in tqdm(news_dataloader):
-				e_lis = input_ids[:,-5:]
-				input_ids = input_ids[:,:-5].cuda()
+				if cfg.use_entity:
+					e_lis = input_ids[:,-5:]
+					input_ids = input_ids[:,:-5].cuda()
+				else:
+					input_ids = input_ids.cuda()
 				news_vec = model.news_encoder(input_ids)
 				news_vec = news_vec.to(torch.device("cpu"))
-				news_vec = torch.concatenate((news_vec, e_lis),-1)
+				if cfg.use_entity:
+					news_vec = torch.concatenate((news_vec, e_lis),-1)
 				news_vec = news_vec.detach().numpy()
 				news_scoring.extend(news_vec)
 
