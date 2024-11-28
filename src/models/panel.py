@@ -1,6 +1,6 @@
 import torch
 import torch.nn as nn
-from torch_geometric.nn import Sequential, GatedGraphConv
+from torch_geometric.nn import Sequential, GatedGraphConv, GCNConv,GATv2Conv, global_mean_pool
 
 from .base.layers import *
 from .component.user_encoder import UserEncoder
@@ -155,16 +155,18 @@ class NAML(torch.nn.Module):
                                                       freeze=False,
                                                       padding_idx=0)
         
-        pretrain = torch.from_numpy(entity_emb).float()
-        self.entity_embedding_layer = nn.Embedding.from_pretrained(pretrain, 
-                                                                   freeze=False, 
-                                                                   padding_idx=0)
-        
         self.news_encoder = NewsEncoder( word_embedding, num_category, num_subcategory)
-        self.user_att = AttentionPooling(self.news_dim, cfg.attention_hidden_dim)
-        self.candi_att = AttentionPooling(self.news_dim, cfg.attention_hidden_dim)
         self.user_encoder = UserEncoder()
-        self.entity_encoder = EntityEncoder(cfg)
+        
+        if cfg.use_entity:
+            pretrain = torch.from_numpy(entity_emb).float()
+            self.entity_embedding_layer = nn.Embedding.from_pretrained(pretrain, 
+                                                                       freeze=False, 
+                                                                       padding_idx=0)
+            self.user_att = AttentionPooling(self.news_dim, cfg.attention_hidden_dim)
+            self.candi_att = AttentionPooling(self.news_dim, cfg.attention_hidden_dim)
+            self.entity_encoder = EntityEncoder(cfg)
+
         self.loss_fn = nn.CrossEntropyLoss()
 
     def forward(self, args):
