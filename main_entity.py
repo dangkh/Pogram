@@ -37,7 +37,7 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 			input_ids = input_ids.to(device)
 			targets = targets.to(device)
 
-			bz_loss, y_hat = model(log_ids, log_mask, input_ids, targets)
+			bz_loss, y_hat = model([log_ids, log_mask, input_ids, targets])
 			loss += bz_loss.data.float()
 			accuary += acc(targets, y_hat)
 			optimizer.zero_grad()
@@ -50,7 +50,7 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 
 def evaluate_modelPanel(model, cfg, mode = 'val'):
 	model.eval()
-	valid_dataloader = load_dataloaderEntity(cfg, mode, model)
+	valid_dataloader = load_dataloader(cfg, mode, model)
 	tasks = []
 	AUC = []
 	MRR = []
@@ -126,11 +126,12 @@ set_random_seed(cfg.random_seed)
 
 """
 logging.info("Prepare the dataset")
+# if using Enriched Entity, make sure that reprocess setting is True
 prepare_preprocessed_data(cfg)
-train_dataloader = load_dataloaderEntity(cfg, mode='train')
+train_dataloader = load_dataloader(cfg, mode='train')
 
 logging.info("Initialize Model")
-model, optimizer = load_modelPanel(cfg)
+model, optimizer = load_model(cfg)
 logging.info("Training Start")
 train_modelPanel(model, optimizer, train_dataloader, cfg)
 

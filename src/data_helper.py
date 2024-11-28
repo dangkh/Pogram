@@ -124,8 +124,9 @@ def read_parsed_news(cfg, news, news_dict,
                 news_title[_news_index, _word_id] = word_dict[_title[_word_id]]
 
     # return news_title, news_entity, news_category, news_subcategory, news_index
-    return news_title, news_category, news_subcategory, news_entity
-    # return news_title, news_category, news_subcategory
+    if cfg.use_entity:
+        return news_title, news_category, news_subcategory, news_entity
+    return news_title, news_category, news_subcategory
 
 
 def read_raw_news(cfg, file_path, mode='train'):
@@ -140,6 +141,10 @@ def read_raw_news(cfg, file_path, mode='train'):
         news = {}
         news_dict = {}
         entity_dict = {}
+    
+    if cfg.use_EnrichE:
+        with open(cfg.data_dir + '_train/refine_data.json', 'r') as f:
+            enrichedE = json.load(f)
 
     category_dict = {}
     subcategory_dict = {}
@@ -156,9 +161,17 @@ def read_raw_news(cfg, file_path, mode='train'):
             # Entity
             if t_entity_str:
                 entity_ids = [obj["WikidataId"] for obj in json.loads(t_entity_str)]
+                if cfg.use_EnrichE and (news_id in enrichedE):
+                    tmp = [x[1] for x in enrichedE[news_id]]
+                    currentid = 0
+                    while (len(entity_ids) < cfg.entity_size) and (currentid < len(tmp) - 1):
+                        if tmp[currentid] not in entity_ids:
+                            entity_ids.append(tmp[currentid])
+                        currentid += 1
                 [update_dict(target_dict=entity_dict, key=entity_id) for entity_id in entity_ids]
             else:
                 entity_ids = t_entity_str
+
             
             tokens = word_tokenize(title.lower())
 

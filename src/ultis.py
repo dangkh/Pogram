@@ -24,6 +24,7 @@ def set_random_seed(random_seed: int = 42) -> None:
 
 
 def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
+	# embedding_matrix = np.random.rand(len(target_dict) + 1, target_dim)
 	embedding_matrix = np.zeros(shape=(len(target_dict) + 1, target_dim))
 	have_item = []
 	if embedding_file_path is not None:
@@ -39,6 +40,7 @@ def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
 					tp = [float(x) for x in line[1:]]
 					embedding_matrix[index] = np.array(tp)
 					have_item.append(itme)
+	have_item = set(have_item)
 	print('-----------------------------------------------------')
 	print(f'Dict length: {len(target_dict)}')
 	print(f'Have words: {len(have_item)}')
@@ -47,7 +49,7 @@ def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
 	return embedding_matrix
 
 
-def load_modelPanel(cfg):
+def load_model(cfg):
 	category_dict = pickle.load(open(os.path.join(cfg.data_dir + '_train', "category_dict.bin"), "rb"))
 	subcategory_dict = pickle.load(open(os.path.join(cfg.data_dir + '_train', "subcategory_dict.bin"), "rb"))
 	if cfg.use_entity:

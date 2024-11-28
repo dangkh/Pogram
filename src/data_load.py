@@ -62,8 +62,8 @@ class Panel_TrainDataset(Dataset):
 				if len(g) == 0:
 					continue
 				self.preprocessDT.append([g,dt])
-				# if len(self.preprocessDT) > 10000:
-				# 	break
+				if self.cfg.prototype and (len(self.preprocessDT) > 10000):
+					break
 	
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
@@ -73,8 +73,7 @@ class Panel_TrainDataset(Dataset):
 		click_docs = self.trans_to_nindex(click_docs)
 
 		# build sub-graph news
-		# k_hops_click = self.build_k_hop(click_docs)
-		k_hops_click = click_docs
+		k_hops_click = self.build_k_hop(click_docs)
 
 		# build sub-graph entity
 		click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
@@ -91,11 +90,14 @@ class Panel_TrainDataset(Dataset):
 
 	def __getitem__(self, idx):
 		k_hops_click, dt =  self.preprocessDT[idx]
-		# subemb = self.news_graph.x[k_hops_click]
-		# sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
-		#                                          relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
-		# sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).cuda()
-		return "", dt
+		if self.cfg.use_graph:
+			subemb = self.news_graph.x[k_hops_click]
+			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
+													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
+			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).cuda()
+		else:
+			sub_news_graph = []
+		return sub_news_graph, dt
 
 	def __len__(self):
 		return len(self.preprocessDT)
@@ -135,7 +137,16 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		return k_hops_click,  [torch.from_numpy(user_feature), torch.from_numpy(log_mask), \
 		torch.from_numpy(news_feature), torch.tensor(label)]
 
-
+	def __getitem__(self, idx):
+		k_hops_click, dt =  self.preprocessDT[idx]
+		if self.cfg.use_graph:
+			subemb = torch.from_numpy(self.news_score[k_hops_click])
+			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
+													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
+			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).to(device)
+		else:
+			sub_news_graph = []
+		return sub_news_graph, dt
 
 class NewsDataset(Dataset):
 	def __init__(self, data):
@@ -147,149 +158,7 @@ class NewsDataset(Dataset):
 	def __len__(self):
 		return self.data.shape[0]
 
-
-# news_dict = {news_id: str, news_id: int}
-# nltk_token_news = {news_id: int, news_feature: list} news_feature = [tokenized title, category, subcate, newsid, entities]
-# news_graph = [edge: pair, edge_index: list keys_pair, edge_attr: list edge_weight]
-# news_neighbors_dict
-def load_data(cfg, mode='train', model=None, local_rank=0):
-	data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}
-
-	# ------------- load news.tsv-------------
-	news_index = pickle.load(open(Path(data_dir[mode]) / "news_dict.bin", "rb"))
-
-	news_input = pickle.load(open(Path(data_dir[mode]) / "nltk_token_news.bin", "rb"))
-	# ------------- load behaviors_np{X}.tsv --------------
-	if mode == 'train':
-		target_file = Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_0.tsv"
-		if cfg.use_graph:
-			news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt")
-
-			if cfg.directed is False:
-				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
-			print(f"[{mode}] News Graph Info: {news_graph}")
-
-			news_neighbors_dict = pickle.load(open(Path(data_dir[mode]) / "news_neighbor_dict.bin", "rb"))
-
-			if cfg.use_entity:
-				entity_neighbors = pickle.load(open(Path(data_dir[mode]) / "entity_neighbor_dict.bin", "rb"))
-				total_length = sum(len(lst) for lst in entity_neighbors.values())
-				print(f"[{mode}] entity_neighbor list Length: {total_length}")
-			else:
-				entity_neighbors = None
-
-			dataset = TrainGraphDataset(
-				filename=target_file,
-				news_index=news_index,
-				news_input=news_input,
-				local_rank=local_rank,
-				cfg=cfg,
-				neighbor_dict=news_neighbors_dict,
-				news_graph=news_graph,
-				entity_neighbors=entity_neighbors
-			)
-			dataloader = DataLoader(dataset, batch_size=None)
-			
-		else:
-			dataset = TrainDataset(
-				filename=target_file,
-				news_index=news_index,
-				news_input=news_input,
-				local_rank=local_rank,
-				cfg=cfg,
-			)
-
-			dataloader = DataLoader(dataset, batch_size=32)
-		return dataloader
-	elif mode in ['val', 'test']:
-		# convert the news to embeddings
-		news_dataset = NewsDataset(news_input)
-		news_dataloader = DataLoader(news_dataset,
-									 batch_size=int(cfg.batch_size * cfg.gpu_num))
-
-		stacked_news = []
-		with torch.no_grad():
-			for news_batch in tqdm(news_dataloader, desc=f"[{local_rank}] Processing validation News Embedding"):
-				if cfg.use_graph:
-					batch_emb = model.local_news_encoder(news_batch.long().unsqueeze(0).to(local_rank)).squeeze(0).detach()
-				else:
-					batch_emb = model.local_news_encoder(news_batch.long().unsqueeze(0).to(local_rank)).squeeze(0).detach()
-				stacked_news.append(batch_emb)
-		news_emb = torch.cat(stacked_news, dim=0).cpu().numpy()   
-
-		if cfg.use_graph:
-			news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt")
-
-			news_neighbors_dict = pickle.load(open(Path(data_dir[mode]) / "news_neighbor_dict.bin", "rb"))
-
-			if cfg.directed is False:
-				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
-			print(f"[{mode}] News Graph Info: {news_graph}")
-
-			if cfg.use_entity:
-				# entity_graph = torch.load(Path(data_dir[mode]) / "entity_graph.pt")
-				entity_neighbors = pickle.load(open(Path(data_dir[mode]) / "entity_neighbor_dict.bin", "rb"))
-				total_length = sum(len(lst) for lst in entity_neighbors.values())
-				print(f"[{mode}] entity_neighbor list Length: {total_length}")
-			else:
-				entity_neighbors = None
-
-			if mode == 'val':
-				dataset = ValidGraphDataset(
-					filename=Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_0.tsv",
-					news_index=news_index,
-					news_input=news_emb,
-					local_rank=local_rank,
-					cfg=cfg,
-					neighbor_dict=news_neighbors_dict,
-					news_graph=news_graph,
-					news_entity=news_input[:,-8:-3],
-					entity_neighbors=entity_neighbors
-				)
-
-			dataloader = DataLoader(dataset, batch_size=None)
-
-		else:
-			if mode == 'val':
-				dataset = ValidDataset(
-					filename=Path(data_dir[mode]) / f"behaviors_0.tsv",
-					news_index=news_index,
-					news_emb=news_emb,
-					local_rank=local_rank,
-					cfg=cfg,
-				)
-			else:
-				dataset = ValidDataset(
-					filename=Path(data_dir[mode]) / f"behaviors.tsv",
-					news_index=news_index,
-					news_emb=news_emb,
-					local_rank=local_rank,
-					cfg=cfg,
-				)
-
-			dataloader = DataLoader(dataset,
-									batch_size=1,
-									# batch_size=int(cfg.batch_   size / cfg.gpu_num),
-									# pin_memory=True, # collate_fn already puts data to GPU
-									collate_fn=lambda b: collate_fn(b, local_rank))
-		return dataloader
-
-
-def collate_fn(tuple_list, local_rank):
-	clicked_news = [x[0] for x in tuple_list]
-	clicked_mask = [x[1] for x in tuple_list]
-	candidate_news = [x[2] for x in tuple_list]
-	clicked_index = [x[3] for x in tuple_list]
-	candidate_index = [x[4] for x in tuple_list]
-
-	if len(tuple_list[0]) == 6:
-		labels = [x[5] for x in tuple_list]
-		return clicked_news, clicked_mask, candidate_news, clicked_index, candidate_index, labels
-	else:
-		return clicked_news, clicked_mask, candidate_news, clicked_index, candidate_index
-
-
-def load_dataloaderEntity(cfg, mode='train', model=None):
+def load_dataloader(cfg, mode='train', model=None):
 	data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir + '_val'}
 
 	# ------------- load news.tsv-------------
@@ -301,14 +170,13 @@ def load_dataloaderEntity(cfg, mode='train', model=None):
 	news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt")
 	if mode == 'train':
 		target_file = Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_0.tsv"
-		# if cfg.use_graph:
+		if cfg.use_graph:
+			if cfg.directed is False:
+				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
+			print(f"[{mode}] News Graph Info: {news_graph}")
 
-		#     if cfg.directed is False:
-		#         news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
-		#     print(f"[{mode}] News Graph Info: {news_graph}")
 
-
-		# if cfg.use_entity:
+		# if cfg.use_entity_global:
 		#     entity_neighbors = pickle.load(open(Path(data_dir[mode]) / "entity_neighbor_dict.bin", "rb"))
 		#     total_length = sum(len(lst) for lst in entity_neighbors.values())
 		#     print(f"[{mode}] entity_neighbor list Length: {total_length}")
@@ -342,16 +210,12 @@ def load_dataloaderEntity(cfg, mode='train', model=None):
 
 		news_scoring = np.array(news_scoring)
 
-		# if cfg.use_graph:
-		#     news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt")
+		if cfg.use_graph:
+			if cfg.directed is False:
+				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
+			print(f"[{mode}] News Graph Info: {news_graph}")
 
-		#     news_neighbors_dict = pickle.load(open(Path(data_dir[mode]) / "news_neighbor_dict.bin", "rb"))
-
-		#     if cfg.directed is False:
-		#         news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
-		#     print(f"[{mode}] News Graph Info: {news_graph}")
-
-		#     if cfg.use_entity:
+		#     if cfg.use_entity_global:
 		#         # entity_graph = torch.load(Path(data_dir[mode]) / "entity_graph.pt")
 		#         entity_neighbors = pickle.load(open(Path(data_dir[mode]) / "entity_neighbor_dict.bin", "rb"))
 		#         total_length = sum(len(lst) for lst in entity_neighbors.values())
