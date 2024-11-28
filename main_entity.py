@@ -37,7 +37,7 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 			input_ids = input_ids.to(device)
 			targets = targets.to(device)
 
-			bz_loss, y_hat = model(log_ids, log_mask, input_ids, targets)
+			bz_loss, y_hat = model([log_ids, log_mask, input_ids, targets])
 			loss += bz_loss.data.float()
 			accuary += acc(targets, y_hat)
 			optimizer.zero_grad()

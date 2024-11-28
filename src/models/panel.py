@@ -167,17 +167,20 @@ class NAML(torch.nn.Module):
         self.entity_encoder = EntityEncoder(cfg)
         self.loss_fn = nn.CrossEntropyLoss()
 
-    def forward(self, history, history_mask, candidate, label):
+    def forward(self, args):
         '''
             history: batch_size, history_length, num_word_title
             history_mask: batch_size, history_length
             candidate: batch_size, 1+K, num_word_title
             label: batch_size, 1+K
         '''
-        e_his = history[:,:,-5:]
-        history = history[:,:,:-5]
-        e_candi = candidate[:,:,-5:]
-        candidate = candidate[:,:,:-5]
+        history, history_mask, candidate, label = args
+        
+        if self.cfg.use_entity:
+            e_his = history[:,:,-5:]
+            history = history[:,:,:-5]
+            e_candi = candidate[:,:,-5:]
+            candidate = candidate[:,:,:-5]
         num_words = history.shape[-1]
         
         if self.cfg.use_entity:
@@ -196,16 +199,14 @@ class NAML(torch.nn.Module):
             user_vec = self.user_att(torch.stack([history, e_his], dim=2).view(-1, 2, self.news_dim))
             user_vec = user_vec.view(-1, self.user_log_length, self.news_dim)
             
-            user_vec = self.user_encoder(user_vec, history_mask)
         else:
        
             candidate = candidate.reshape(-1, num_words)
             candidate = self.news_encoder(candidate).reshape(-1, 1 + self.npratio, self.news_dim)
             history = history.reshape(-1, num_words)
-            history = self.news_encoder(history).reshape(-1, self.user_log_length, self.news_dim)
-            user_vec = self.user_encoder(history, history_mask)
+            user_vec = self.news_encoder(history).reshape(-1, self.user_log_length, self.news_dim)
         
-
+        user_vec = self.user_encoder(user_vec, history_mask)
         score = torch.bmm(candidate, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
         loss = self.loss_fn(score, label)
   
