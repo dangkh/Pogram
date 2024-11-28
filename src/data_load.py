@@ -62,8 +62,8 @@ class Panel_TrainDataset(Dataset):
 				if len(g) == 0:
 					continue
 				self.preprocessDT.append([g,dt])
-				# if len(self.preprocessDT) > 10000:
-				# 	break
+				if self.cfg.prototype and (len(self.preprocessDT) > 10000):
+					break
 	
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
@@ -73,8 +73,7 @@ class Panel_TrainDataset(Dataset):
 		click_docs = self.trans_to_nindex(click_docs)
 
 		# build sub-graph news
-		# k_hops_click = self.build_k_hop(click_docs)
-		k_hops_click = click_docs
+		k_hops_click = self.build_k_hop(click_docs)
 
 		# build sub-graph entity
 		click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
@@ -91,11 +90,14 @@ class Panel_TrainDataset(Dataset):
 
 	def __getitem__(self, idx):
 		k_hops_click, dt =  self.preprocessDT[idx]
-		# subemb = self.news_graph.x[k_hops_click]
-		# sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
-		#                                          relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
-		# sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).cuda()
-		return "", dt
+		if self.cfg.use_graph:
+			subemb = self.news_graph.x[k_hops_click]
+			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
+													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
+			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).cuda()
+		else:
+			sub_news_graph = []
+		return sub_news_graph, dt
 
 	def __len__(self):
 		return len(self.preprocessDT)
@@ -135,7 +137,16 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		return k_hops_click,  [torch.from_numpy(user_feature), torch.from_numpy(log_mask), \
 		torch.from_numpy(news_feature), torch.tensor(label)]
 
-
+	def __getitem__(self, idx):
+		k_hops_click, dt =  self.preprocessDT[idx]
+		if self.cfg.use_graph:
+			subemb = torch.from_numpy(self.news_score[k_hops_click])
+			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
+													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
+			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).to(device)
+		else:
+			sub_news_graph = []
+		return sub_news_graph, dt
 
 class NewsDataset(Dataset):
 	def __init__(self, data):
@@ -147,7 +158,7 @@ class NewsDataset(Dataset):
 	def __len__(self):
 		return self.data.shape[0]
 
-def load_dataloaderEntity(cfg, mode='train', model=None):
+def load_dataloader(cfg, mode='train', model=None):
 	data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir + '_val'}
 
 	# ------------- load news.tsv-------------
@@ -159,14 +170,13 @@ def load_dataloaderEntity(cfg, mode='train', model=None):
 	news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt")
 	if mode == 'train':
 		target_file = Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_0.tsv"
-		# if cfg.use_graph:
+		if cfg.use_graph:
+			if cfg.directed is False:
+				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
+			print(f"[{mode}] News Graph Info: {news_graph}")
 
-		#     if cfg.directed is False:
-		#         news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
-		#     print(f"[{mode}] News Graph Info: {news_graph}")
 
-
-		# if cfg.use_entity:
+		# if cfg.use_entity_global:
 		#     entity_neighbors = pickle.load(open(Path(data_dir[mode]) / "entity_neighbor_dict.bin", "rb"))
 		#     total_length = sum(len(lst) for lst in entity_neighbors.values())
 		#     print(f"[{mode}] entity_neighbor list Length: {total_length}")
@@ -200,16 +210,12 @@ def load_dataloaderEntity(cfg, mode='train', model=None):
 
 		news_scoring = np.array(news_scoring)
 
-		# if cfg.use_graph:
-		#     news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt")
+		if cfg.use_graph:
+			if cfg.directed is False:
+				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
+			print(f"[{mode}] News Graph Info: {news_graph}")
 
-		#     news_neighbors_dict = pickle.load(open(Path(data_dir[mode]) / "news_neighbor_dict.bin", "rb"))
-
-		#     if cfg.directed is False:
-		#         news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
-		#     print(f"[{mode}] News Graph Info: {news_graph}")
-
-		#     if cfg.use_entity:
+		#     if cfg.use_entity_global:
 		#         # entity_graph = torch.load(Path(data_dir[mode]) / "entity_graph.pt")
 		#         entity_neighbors = pickle.load(open(Path(data_dir[mode]) / "entity_neighbor_dict.bin", "rb"))
 		#         total_length = sum(len(lst) for lst in entity_neighbors.values())

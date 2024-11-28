@@ -124,8 +124,9 @@ def read_parsed_news(cfg, news, news_dict,
                 news_title[_news_index, _word_id] = word_dict[_title[_word_id]]
 
     # return news_title, news_entity, news_category, news_subcategory, news_index
-    return news_title, news_category, news_subcategory, news_entity
-    # return news_title, news_category, news_subcategory
+    if cfg.use_entity:
+        return news_title, news_category, news_subcategory, news_entity
+    return news_title, news_category, news_subcategory
 
 
 def read_raw_news(cfg, file_path, mode='train'):
