@@ -141,6 +141,8 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		k_hops_click, dt =  self.preprocessDT[idx]
 		if self.cfg.use_graph:
 			subemb = torch.from_numpy(self.news_score[k_hops_click])
+			if self.cfg.use_entity:
+				subemb = subemb[:, :-5]
 			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
 													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
 			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).to(device)
@@ -173,7 +175,7 @@ def load_dataloader(cfg, mode='train', model=None):
 		if cfg.use_graph:
 			if cfg.directed is False:
 				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
-			print(f"[{mode}] News Graph Info: {news_graph}")
+				print(f"[{mode}] News Graph Info: {news_graph}")
 
 
 		# if cfg.use_entity_global:

@@ -5,11 +5,11 @@ from ..base.layers import *
 from torch_geometric.nn import Sequential
 
 class UserEncoder(nn.Module):
-    def __init__(self):
+    def __init__(self, cfg):
         super(UserEncoder, self).__init__()
         news_dim = 400
         user_query_vector_dim = 200
-        self.user_log_length = 50
+        self.user_log_length = cfg.his_size
         self.user_log_mask = False
         self.attn = AttentionPooling(news_dim, user_query_vector_dim)
         self.pad_doc = nn.Parameter(torch.empty(1, news_dim).uniform_(-1, 1)).type(torch.FloatTensor)

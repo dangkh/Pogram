@@ -50,6 +50,7 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 
 def evaluate_modelPanel(model, cfg, mode = 'val'):
 	model.eval()
+	torch.set_grad_enabled(False)
 	valid_dataloader = load_dataloader(cfg, mode, model)
 	tasks = []
 	AUC = []
@@ -63,7 +64,6 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 		if cfg.use_graph:
 			graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
 			graph_vec = model.gcn(graph_vec, edge_index)
-			graph_vec = graph_vec.relu()
 			graph_vec = model.gln(graph_vec)
 			graph_vec = model.glob_mean(graph_vec, batch)
 
@@ -142,6 +142,7 @@ train_dataloader = load_dataloader(cfg, mode='train')
 
 logging.info("Initialize Model")
 model, optimizer = load_model(cfg)
+print(model)
 logging.info("Training Start")
 train_modelPanel(model, optimizer, train_dataloader, cfg)
 
