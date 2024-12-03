@@ -65,6 +65,7 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 			graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
 			graph_vec = model.gcn(graph_vec, edge_index)
 			graph_vec = model.gln(graph_vec)
+			graph_vec = model.relu(graph_vec)
 			graph_vec = model.glob_mean(graph_vec, batch)
 
 		if cfg.use_entity:

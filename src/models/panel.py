@@ -174,6 +174,7 @@ class NAML(torch.nn.Module):
             # self.loc_glob_att = MultiHeadSelfAttention(self.news_dim, cfg.head_num , cfg.head_dim , cfg.head_dim)
             self.loc_glob_att = AttentionPooling(self.news_dim, 128)
             self.glob_mean = global_mean_pool
+            self.relu = nn.LeakyReLU(0.2)
 
         self.loss_fn = nn.CrossEntropyLoss()
 
@@ -190,6 +191,7 @@ class NAML(torch.nn.Module):
             graph_vec = self.news_encoder(graph_vec)
             graph_vec = self.gcn(graph_vec, edge_index)
             graph_vec = self.gln(graph_vec)
+            graph_vec = self.relu(graph_vec)
             graph_vec = self.glob_mean(graph_vec, batch)
         else:
             _, history, history_mask, candidate, label = args
