@@ -29,6 +29,8 @@ class Panel_TrainDataset(Dataset):
 		self.neighbor_dict = neighbor_dict
 		self.news_graph = news_graph
 		self.news_graph.x = self.news_graph.x.float()
+		self.listPrep = []
+		self.prepDatabyUser = []
 		self.prepare()
 
 	def trans_to_nindex(self, nids):
@@ -58,46 +60,58 @@ class Panel_TrainDataset(Dataset):
 		self.preprocessDT = []
 		with open(self.filename) as f:
 			for line in tqdm(f):
-				g, dt = self.line_mapper(line)
-				if len(g) == 0:
+				uid, dt = self.line_mapper(line)
+				if len(uid) == 0:
 					continue
-				self.preprocessDT.append([g,dt])
+				self.preprocessDT.append([uid,dt])
 				if self.cfg.prototype and (len(self.preprocessDT) > 10000):
 					break
 	
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
-		click_docs = line[3].split()
+		uid = line[1]
+		if uid not in self.listPrep:
+			self.listPrep.append(uid)
+			click_docs = line[3].split()
+			click_docs = self.trans_to_nindex(click_docs)
+			click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
+			user_feature = self.news_combined[click_docs]
+
+
+			# build sub-graph
+			if self.cfg.use_graph:
+				k_hops_click = self.build_k_hop(click_docs)
+				if len(k_hops_click) == 0:
+					return [], []
+				subemb = self.news_graph.x[k_hops_click]
+
+				sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
+														relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
+				sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr)
+				self.prepDatabyUser.append([sub_news_graph, user_feature, log_mask])
+			else:
+				sub_news_graph = []
+				self.prepDatabyUser.append([sub_news_graph, user_feature, log_mask])
+
 		sess_pos = line[4].split()
 		sess_neg = line[5].split()
-		click_docs = self.trans_to_nindex(click_docs)
-
-		# build sub-graph news
-		k_hops_click = self.build_k_hop(click_docs)
-
-		# build sub-graph entity
-		click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
-		user_feature = self.news_combined[click_docs]
-
 		pos = self.trans_to_nindex(sess_pos)
 		neg = self.trans_to_nindex(sess_neg)
 
 		label = random.randint(0, self.npratio)
 		sample_news = neg[:label] + pos + neg[label:]
 		news_feature = self.news_combined[sample_news]
-		return k_hops_click, [torch.from_numpy(user_feature), torch.from_numpy(log_mask), \
-		torch.from_numpy(news_feature), torch.tensor(label)]
+
+		return uid, [torch.from_numpy(news_feature), torch.tensor(label)]
 
 	def __getitem__(self, idx):
-		k_hops_click, dt =  self.preprocessDT[idx]
+		uid, [news_feature, label]  =  self.preprocessDT[idx]
+		sub_news_graph, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
+		dt = [torch.from_numpy(user_feature), torch.from_numpy(log_mask), news_feature, label]
 		if self.cfg.use_graph:
-			subemb = self.news_graph.x[k_hops_click]
-			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
-													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
-			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).cuda()
+			return sub_news_graph.to(device), dt
 		else:
-			sub_news_graph = []
-		return sub_news_graph, dt
+			return sub_news_graph, dt
 
 	def __len__(self):
 		return len(self.preprocessDT)
@@ -114,41 +128,44 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		self.neighbor_dict = neighbor_dict
 		self.news_graph = news_graph
 		self.news_graph.x = self.news_graph.x.float()
+		self.listPrep = []
+		self.prepDatabyUser = []
 		self.prepare()
 
 
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
-		click_docs = line[3].split()
-		
-		candidate_news = self.trans_to_nindex([i.split('-')[0] for i in line[4].split()])
-		label = [int(i.split('-')[1]) for i in line[4].split()]
-		
-		click_docs = self.trans_to_nindex(click_docs)
+		uid = line[1]
+		if uid not in self.listPrep:
+			self.listPrep.append(uid)
+			click_docs = line[3].split()
+			click_docs = self.trans_to_nindex(click_docs)
+			click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
+			user_feature = self.news_score[click_docs]
 
-		# build sub-graph
-		k_hops_click = self.build_k_hop(click_docs)
-		
-		click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
-		user_feature = self.news_score[click_docs]
+			# build sub-graph
+			if self.cfg.use_graph:
+				k_hops_click = self.build_k_hop(click_docs)
+				if len(k_hops_click) == 0:
+					return [], []
+				subemb = torch.from_numpy(self.news_score[k_hops_click])
+				if self.cfg.use_entity:
+					subemb = subemb[:, :-5]
+				sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
+														relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
+				sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr)
+			else:
+				sub_news_graph = []
+			self.prepDatabyUser.append([sub_news_graph, user_feature, log_mask])
+
+
+		candidate_news = self.trans_to_nindex([i.split('-')[0] for i in line[4].split()])
+		label = np.array([int(i.split('-')[1]) for i in line[4].split()])
 
 		news_feature = self.news_score[candidate_news]
-		
-		return k_hops_click,  [torch.from_numpy(user_feature), torch.from_numpy(log_mask), \
-		torch.from_numpy(news_feature), torch.tensor(label)]
 
-	def __getitem__(self, idx):
-		k_hops_click, dt =  self.preprocessDT[idx]
-		if self.cfg.use_graph:
-			subemb = torch.from_numpy(self.news_score[k_hops_click])
-			if self.cfg.use_entity:
-				subemb = subemb[:, :-5]
-			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
-													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
-			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).to(device)
-		else:
-			sub_news_graph = []
-		return sub_news_graph, dt
+		return uid, [torch.from_numpy(news_feature), torch.tensor(label)]
+
 
 class NewsDataset(Dataset):
 	def __init__(self, data):
