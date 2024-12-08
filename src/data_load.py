@@ -15,7 +15,7 @@ from torch_geometric.utils import subgraph
 from torch_geometric.loader import DataLoader as GraphDataLoader
 
 import random
-
+device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	
 class Panel_TrainDataset(Dataset):
 	def __init__(self, filename, news_index, news_combined, cfg, neighbor_dict, news_graph):
@@ -29,6 +29,8 @@ class Panel_TrainDataset(Dataset):
 		self.neighbor_dict = neighbor_dict
 		self.news_graph = news_graph
 		self.news_graph.x = self.news_graph.x.float()
+		self.listPrep = []
+		self.prepDatabyUser = []
 		self.prepare()
 
 	def trans_to_nindex(self, nids):
@@ -58,45 +60,39 @@ class Panel_TrainDataset(Dataset):
 		self.preprocessDT = []
 		with open(self.filename) as f:
 			for line in tqdm(f):
-				g, dt = self.line_mapper(line)
-				if len(g) == 0:
+				uid, dt = self.line_mapper(line)
+				if len(uid) == 0:
 					continue
-				self.preprocessDT.append([g,dt])
+				self.preprocessDT.append([uid,dt])
 				if self.cfg.prototype and (len(self.preprocessDT) > 10000):
 					break
 	
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
+		uid = line[1]
 		click_docs = line[3].split()
-		sess_pos = line[4].split()
-		sess_neg = line[5].split()
 		click_docs = self.trans_to_nindex(click_docs)
-
-		# build sub-graph news
 		k_hops_click = self.build_k_hop(click_docs)
-
-		# build sub-graph entity
 		click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
 		user_feature = self.news_combined[click_docs]
 
+		sub_news_graph = []
+		
+		sess_pos = line[4].split()
+		sess_neg = line[5].split()
 		pos = self.trans_to_nindex(sess_pos)
 		neg = self.trans_to_nindex(sess_neg)
 
 		label = random.randint(0, self.npratio)
 		sample_news = neg[:label] + pos + neg[label:]
 		news_feature = self.news_combined[sample_news]
+
 		return k_hops_click, [torch.from_numpy(user_feature), torch.from_numpy(log_mask), \
 		torch.from_numpy(news_feature), torch.tensor(label)]
 
 	def __getitem__(self, idx):
 		k_hops_click, dt =  self.preprocessDT[idx]
-		if self.cfg.use_graph:
-			subemb = self.news_graph.x[k_hops_click]
-			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
-													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
-			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).cuda()
-		else:
-			sub_news_graph = []
+		sub_news_graph = []
 		return sub_news_graph, dt
 
 	def __len__(self):
@@ -114,39 +110,29 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		self.neighbor_dict = neighbor_dict
 		self.news_graph = news_graph
 		self.news_graph.x = self.news_graph.x.float()
+		self.listPrep = []
+		self.prepDatabyUser = []
 		self.prepare()
 
 
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
+		uid = line[1]
+		
 		click_docs = line[3].split()
-		
-		candidate_news = self.trans_to_nindex([i.split('-')[0] for i in line[4].split()])
-		label = [int(i.split('-')[1]) for i in line[4].split()]
-		
 		click_docs = self.trans_to_nindex(click_docs)
-
-		# build sub-graph
 		k_hops_click = self.build_k_hop(click_docs)
-		
 		click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
 		user_feature = self.news_score[click_docs]
 
+		candidate_news = self.trans_to_nindex([i.split('-')[0] for i in line[4].split()])
+		label = np.array([int(i.split('-')[1]) for i in line[4].split()])
+
 		news_feature = self.news_score[candidate_news]
-		
+
 		return k_hops_click,  [torch.from_numpy(user_feature), torch.from_numpy(log_mask), \
 		torch.from_numpy(news_feature), torch.tensor(label)]
 
-	def __getitem__(self, idx):
-		k_hops_click, dt =  self.preprocessDT[idx]
-		if self.cfg.use_graph:
-			subemb = torch.from_numpy(self.news_score[k_hops_click])
-			sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
-													 relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
-			sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr).to(device)
-		else:
-			sub_news_graph = []
-		return sub_news_graph, dt
 
 class NewsDataset(Dataset):
 	def __init__(self, data):
@@ -173,7 +159,7 @@ def load_dataloader(cfg, mode='train', model=None):
 		if cfg.use_graph:
 			if cfg.directed is False:
 				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
-			print(f"[{mode}] News Graph Info: {news_graph}")
+				print(f"[{mode}] News Graph Info: {news_graph}")
 
 
 		# if cfg.use_entity_global:
@@ -200,11 +186,15 @@ def load_dataloader(cfg, mode='train', model=None):
 		news_scoring = []
 		with torch.no_grad():
 			for input_ids in tqdm(news_dataloader):
-				e_lis = input_ids[:,-5:]
-				input_ids = input_ids[:,:-5].cuda()
+				if cfg.use_entity:
+					e_lis = input_ids[:,-5:]
+					input_ids = input_ids[:,:-5].cuda()
+				else:
+					input_ids = input_ids.cuda()
 				news_vec = model.news_encoder(input_ids)
 				news_vec = news_vec.to(torch.device("cpu"))
-				news_vec = torch.concatenate((news_vec, e_lis),-1)
+				if cfg.use_entity:
+					news_vec = torch.concatenate((news_vec, e_lis),-1)
 				news_vec = news_vec.detach().numpy()
 				news_scoring.extend(news_vec)
 
@@ -248,4 +238,3 @@ def load_dataloader(cfg, mode='train', model=None):
 		
 
 	return dataloader
-
