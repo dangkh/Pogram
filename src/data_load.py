@@ -212,7 +212,7 @@ def load_dataloader(cfg, mode='train', model=None):
 			neighbor_dict=news_neighbors_dict,
 			news_graph=news_graph
 		)
-		dataloader = GraphDataLoader(dataset, batch_size=128)
+		dataloader = GraphDataLoader(dataset, batch_size=cfg.batch_size)
 	elif mode in ['val', 'test']:
 		# convert the news to embeddings
 		news_dataset = NewsDataset(news_input)

@@ -6,6 +6,7 @@ from src.ultis import *
 from src.data_helper import prepare_preprocessed_data
 from src.data_load import *
 from src.metrics import *
+device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def acc(y_true, y_hat):
 	y_hat = torch.argmax(y_hat, dim=-1)
@@ -48,7 +49,17 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 		print(loss, accuary)
 		model.train()
 
+		
+		checkpoint = {
+			'epoch': cfg.epochs,  
+			'model_state_dict': model.state_dict(),
+			'optimizer_state_dict': optimizer.state_dict(),
+			'loss': loss,  # Save loss or any other metric
+		}
+		# Save the checkpoint
+
 def evaluate_modelPanel(model, cfg, mode = 'val'):
+
 	model.eval()
 	torch.set_grad_enabled(False)
 	valid_dataloader = load_dataloader(cfg, mode, model)
@@ -97,9 +108,6 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 
 		user_vecs = user_vecs.to(torch.device("cpu")).detach().numpy()
 		
-		# candidate = candidate.view(-1, model.npratio+1, self.news_dim)
-		# (1, 400) torch.Size([1, 22, 400]) (1, 22)
-
 		labels = labels.to(torch.device("cpu")).detach().numpy()
 
 		for user_vec, news_vec, label in zip(user_vecs, news_vecs, labels):
@@ -128,25 +136,22 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 	return res
 
 cfg = TrainConfig
-device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 logging.info("Start")
 set_random_seed(cfg.random_seed)
-"""
-0. Definite Parameters & Functions
-
-"""
-logging.info("Prepare the dataset")
-# if using Enriched Entity, make sure that reprocess setting is True
-prepare_preprocessed_data(cfg)
-train_dataloader = load_dataloader(cfg, mode='train')
 
 logging.info("Initialize Model")
 model, optimizer = load_model(cfg)
+model = model.to(device)
 print(model)
-logging.info("Training Start")
-train_modelPanel(model, optimizer, train_dataloader, cfg)
+checkpoint = torch.load(f'./checkpoint/use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
+model.load_state_dict(checkpoint['model_state_dict'])
+optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
+# Restore additional information
+epoch = checkpoint['epoch']
+loss = checkpoint['loss']
+	
 logging.info("Evaluation")
 testRes = evaluate_modelPanel(model, cfg, mode='test')
 print(testRes)

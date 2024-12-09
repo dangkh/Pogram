@@ -5,7 +5,7 @@ class TrainConfig:
     random_seed: int = 1009
     npratio: int = 4
     history_size: int = 50
-    batch_size: int = 32
+    batch_size: int = 128
     gradient_accumulation_steps: int = 8  # batch_size = 16 x 8 = 128
     epochs: int = 5
     learning_rate: float = 3e-4
@@ -33,7 +33,7 @@ class TrainConfig:
     his_size = 50
     k_hops = 1
     num_neighbors = 8
-    use_graph = True
+    use_graph = False
     use_entity = True
     use_EnrichE = False
     early_stop_patience = 5
