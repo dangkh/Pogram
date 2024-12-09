@@ -8,7 +8,7 @@ class TrainConfig:
     batch_size: int = 32
     gradient_accumulation_steps: int = 8  # batch_size = 16 x 8 = 128
     epochs: int = 5
-    learning_rate: float = 1e-4
+    learning_rate: float = 3e-4
     weight_decay: float = 1e-5
     max_len: int = 100
     reprocess: bool = True
@@ -21,7 +21,6 @@ class TrainConfig:
     use_graph_type: int = 0 # adjacency connect or fully connect, fully set = 1
     directed: bool = False
     model_name: str = "GLORY"
-    entity_local: bool = True
     entity_global: bool = False
     glove_path = './data/glove.840B.300d.txt'
     word_emb_dim = 300
@@ -34,8 +33,8 @@ class TrainConfig:
     his_size = 50
     k_hops = 1
     num_neighbors = 8
-    use_graph = False
+    use_graph = True
     use_entity = True
     use_EnrichE = False
     early_stop_patience = 5
-    prototype = False
+    prototype = True
