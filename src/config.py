@@ -11,8 +11,8 @@ class TrainConfig:
     learning_rate: float = 3e-4
     weight_decay: float = 1e-5
     max_len: int = 100
-    reprocess: bool = False
-    reprocess_neighbors : bool = False
+    reprocess: bool = True
+    reprocess_neighbors : bool = True
     data_dir: str = "./data/MINDsmall"
     gpu_num: int = 1
     title_size: int = 20
@@ -33,7 +33,7 @@ class TrainConfig:
     his_size = 50
     k_hops = 1
     num_neighbors = 8
-    use_graph = False
+    use_graph = True
     use_entity = True
     use_EnrichE = False
     early_stop_patience = 5
