@@ -24,8 +24,8 @@ def set_random_seed(random_seed: int = 42) -> None:
 
 
 def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
-	# embedding_matrix = np.random.rand(len(target_dict) + 1, target_dim)
-	embedding_matrix = np.zeros(shape=(len(target_dict) + 1, target_dim))
+	embedding_matrix = np.random.rand(len(target_dict) + 1, target_dim)
+	# embedding_matrix = np.zeros(shape=(len(target_dict) + 1, target_dim))
 	have_item = []
 	if embedding_file_path is not None:
 		with open(embedding_file_path, 'rb') as f:
