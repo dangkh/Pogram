@@ -57,7 +57,7 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 			'loss': loss,  # Save loss or any other metric
 		}
 		# Save the checkpoint
-		torch.save(checkpoint, f'./checkpoint/use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
+		torch.save(checkpoint, f'./checkpoint/{ep}use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
 
 cfg = TrainConfig
 

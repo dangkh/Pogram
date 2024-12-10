@@ -143,7 +143,7 @@ def read_raw_news(cfg, file_path, mode='train'):
         entity_dict = {}
     
     if cfg.use_EnrichE:
-        with open(cfg.data_dir + '_train/refine_data.json', 'r') as f:
+        with open(cfg.data_dir + '_train/refine_data_full.json', 'r') as f:
             enrichedE = json.load(f)
 
     category_dict = {}

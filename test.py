@@ -24,39 +24,6 @@ def get_sum(arr):
 	return [np.array(i).sum() for i in arr]
 
 
-def train_modelPanel(model, optimizer, dataloader, cfg):
-	model = model.to(device)
-	model.train()
-	torch.set_grad_enabled(True)
-	for ep in range(cfg.epochs):
-		loss = 0.0
-		accuary = 0.0
-		print("EPOCH: " + str(ep))
-		for cnt, (g, [log_ids, log_mask, input_ids, targets]) in tqdm(enumerate(dataloader)):
-			log_ids = log_ids.to(device)
-			log_mask = log_mask.to(device)
-			input_ids = input_ids.to(device)
-			targets = targets.to(device)
-
-			bz_loss, y_hat = model([g, log_ids, log_mask, input_ids, targets])
-			loss += bz_loss.data.float()
-			accuary += acc(targets, y_hat)
-			optimizer.zero_grad()
-			bz_loss.backward()
-			optimizer.step()
-
-		# eval_acc = evaluate_modelPanel(model, cfg)
-		print(loss, accuary)
-		model.train()
-
-		
-		checkpoint = {
-			'epoch': cfg.epochs,  
-			'model_state_dict': model.state_dict(),
-			'optimizer_state_dict': optimizer.state_dict(),
-			'loss': loss,  # Save loss or any other metric
-		}
-		# Save the checkpoint
 
 def evaluate_modelPanel(model, cfg, mode = 'val'):
 
@@ -144,7 +111,7 @@ logging.info("Initialize Model")
 model, optimizer = load_model(cfg)
 model = model.to(device)
 print(model)
-checkpoint = torch.load(f'./checkpoint/use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
+checkpoint = torch.load(f'./checkpoint/1use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
 model.load_state_dict(checkpoint['model_state_dict'])
 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
