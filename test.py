@@ -7,6 +7,9 @@ from src.data_helper import prepare_preprocessed_data
 from src.data_load import *
 from src.metrics import *
 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+parser = argparse.ArgumentParser()
+parser.add_argument('--checknum', type=int, default=4, help=f'')
+args = parser.parse_args()
 
 def acc(y_true, y_hat):
 	y_hat = torch.argmax(y_hat, dim=-1)
@@ -101,7 +104,6 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 	}
 	
 	return res
-
 cfg = TrainConfig
 
 logging.info("Start")
@@ -111,7 +113,7 @@ logging.info("Initialize Model")
 model, optimizer = load_model(cfg)
 model = model.to(device)
 print(model)
-checkpoint = torch.load(f'./checkpoint/1use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
+checkpoint = torch.load(f'./checkpoint/{args.checknum}use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
 model.load_state_dict(checkpoint['model_state_dict'])
 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 

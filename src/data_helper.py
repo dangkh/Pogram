@@ -146,6 +146,11 @@ def read_raw_news(cfg, file_path, mode='train'):
         with open(cfg.data_dir + '_train/refine_data_full.json', 'r') as f:
             enrichedE = json.load(f)
 
+    if cfg.genAbs:
+        with open(cfg.data_dir + '_train/genAbs.json', 'r') as f:
+            genAbs = json.load(f)
+            listGenKey = list(genAbs.keys())
+
     category_dict = {}
     subcategory_dict = {}
     word_cnt = Counter()  # Counter is a subclass of the dictionary dict.
@@ -156,6 +161,8 @@ def read_raw_news(cfg, file_path, mode='train'):
             # split one line
             split_line = line.strip('\n').split('\t')
             news_id, category, subcategory, title, abstract, url, t_entity_str, _ = split_line
+            if cfg.genAbs and news_id in listGenKey:
+                title = genAbs[news_id][0]
             update_dict(target_dict=news_dict, key=news_id)
 
             # Entity

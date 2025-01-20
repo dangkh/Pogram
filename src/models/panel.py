@@ -156,7 +156,7 @@ class NAML(torch.nn.Module):
                                                       freeze=False,
                                                       padding_idx=0)
         
-        self.news_encoder = NewsEncoder( word_embedding, num_category, num_subcategory)
+        self.news_encoder = NewsEncoder( word_embedding, num_category, num_subcategory, cfg.title_size)
         self.user_encoder = UserEncoder(cfg)
         
         if cfg.use_entity:
