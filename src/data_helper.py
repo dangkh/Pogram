@@ -308,7 +308,7 @@ def prepare_news_graph(cfg, mode='train'):
         print(f"[{mode}] Finish News Graph Construction, \nGraph Path: {target_path} \nGraph Info: {data}")
     
     elif mode in ['test', 'val']:
-        origin_graph = torch.load(origin_graph_path)
+        origin_graph = torch.load(origin_graph_path, weights_only = False)
         edge_index = origin_graph.edge_index
         edge_attr = origin_graph.edge_attr
         node_feat = nltk_token_news
@@ -340,11 +340,11 @@ def prepare_neighbor_list(cfg, mode='train', target='news'):
     if target == 'news':
         target_graph_path = Path(data_dir[mode] ) / "nltk_news_graph.pt"
         target_dict = pickle.load(open(Path(data_dir[mode] ) / "news_dict.bin", "rb"))
-        graph_data = torch.load(target_graph_path)
+        graph_data = torch.load(target_graph_path, weights_only = False)
     elif target == 'entity':
         target_graph_path = Path(data_dir[mode] ) / "entity_graph.pt"
         target_dict = pickle.load(open(Path(data_dir[mode]) / "entity_dict.bin", "rb"))
-        graph_data = torch.load(target_graph_path)
+        graph_data = torch.load(target_graph_path, weights_only = False)
     else:
         assert False, f"[{mode}] Wrong target {target} "
 
@@ -387,7 +387,7 @@ def prepare_entity_graph(cfg, mode='train'):
 
     if mode == 'train':
         target_news_graph_path = Path(data_dir[mode]) / "nltk_news_graph.pt"
-        news_graph = torch.load(target_news_graph_path)
+        news_graph = torch.load(target_news_graph_path, weights_only = False)
         print("news_graph,", news_graph)
         entity_indices = news_graph.x[:, -8:-3].numpy()
         print("entity_indices, ", entity_indices.shape)
@@ -428,7 +428,7 @@ def prepare_entity_graph(cfg, mode='train'):
         torch.save(data, target_path)
         print(f"[{mode}] Finish Entity Graph Construction, \n Graph Path: {target_path} \nGraph Info: {data}")
     elif mode in ['val', 'test']:
-        origin_graph = torch.load(origin_graph_path)
+        origin_graph = torch.load(origin_graph_path, weights_only = False)
         edge_index = origin_graph.edge_index
         edge_attr = origin_graph.edge_attr
 

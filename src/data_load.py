@@ -188,14 +188,13 @@ def load_dataloader(cfg, mode='train', model=None):
 	news_input = pickle.load(open(Path(data_dir[mode]) / "nltk_token_news.bin", "rb"))
 	# ------------- load behaviors_np{X}.tsv --------------
 	news_neighbors_dict = pickle.load(open(Path(data_dir[mode]) / "news_neighbor_dict.bin", "rb"))
-	news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt")
+	news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt", weights_only=False)
 	if mode == 'train':
 		target_file = Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_0.tsv"
 		if cfg.use_graph:
 			if cfg.directed is False:
 				news_graph.edge_index, news_graph.edge_attr = to_undirected(news_graph.edge_index, news_graph.edge_attr)
 				print(f"[{mode}] News Graph Info: {news_graph}")
-
 
 		# if cfg.use_entity_global:
 		#     entity_neighbors = pickle.load(open(Path(data_dir[mode]) / "entity_neighbor_dict.bin", "rb"))
