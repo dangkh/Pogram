@@ -6,7 +6,13 @@ from src.ultis import *
 from src.data_helper import prepare_preprocessed_data
 from src.data_load import *
 from src.metrics import *
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+parser = argparse.ArgumentParser()
+parser.add_argument('--checknum', type=int, default=4, help=f'')
+args = parser.parse_args()
 
 def acc(y_true, y_hat):
 	y_hat = torch.argmax(y_hat, dim=-1)
@@ -62,7 +68,7 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 			user_vecs = model.user_att(torch.stack([log_vecs, e_his], dim=2).view(-1, 2, model.news_dim))
 			user_vecs = user_vecs.view(-1, model.user_log_length, model.news_dim)
 			news_vecs = model.candi_att(torch.stack([news_vecs, e_candi], dim=2).view(-1, 2, model.news_dim))
-			news_vecs = news_vecs.unsqueeze(0).to(torch.device("cpu")).detach().numpy()
+			news_vecs = news_vecs.unsqueeze(0).detach().cpu().numpy()
 
 		else:
 			user_vecs = log_vecs.view(-1, model.user_log_length, model.news_dim)
@@ -73,9 +79,9 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 			user_vecs = torch.stack([user_vecs, graph_vec], dim=1)
 			user_vecs = model.loc_glob_att(user_vecs)
 
-		user_vecs = user_vecs.to(torch.device("cpu")).detach().numpy()
+		user_vecs = user_vecs.detach().cpu().numpy()
 		
-		labels = labels.to(torch.device("cpu")).detach().numpy()
+		labels = labels.detach().cpu().numpy()
 
 		for user_vec, news_vec, label in zip(user_vecs, news_vecs, labels):
 			tmp = np.mean(label)
@@ -101,7 +107,6 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 	}
 	
 	return res
-
 cfg = TrainConfig
 
 logging.info("Start")
@@ -111,7 +116,7 @@ logging.info("Initialize Model")
 model, optimizer = load_model(cfg)
 model = model.to(device)
 print(model)
-checkpoint = torch.load(f'./checkpoint/1use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
+checkpoint = torch.load(f'./checkpoint/{args.checknum}use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth', weights_only = False)
 model.load_state_dict(checkpoint['model_state_dict'])
 optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 

@@ -33,8 +33,9 @@ class TrainConfig:
     his_size = 50
     k_hops = 1
     num_neighbors = 8
-    use_graph = False
-    use_entity = True
-    use_EnrichE = True
+    use_graph = True
+    use_entity = False
+    use_EnrichE = False
     early_stop_patience = 5
-    prototype = False
+    prototype = True
+    genAbs = False

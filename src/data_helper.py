@@ -146,6 +146,11 @@ def read_raw_news(cfg, file_path, mode='train'):
         with open(cfg.data_dir + '_train/refine_data_full.json', 'r') as f:
             enrichedE = json.load(f)
 
+    if cfg.genAbs:
+        with open(cfg.data_dir + '_train/genAbs.json', 'r') as f:
+            genAbs = json.load(f)
+            listGenKey = list(genAbs.keys())
+
     category_dict = {}
     subcategory_dict = {}
     word_cnt = Counter()  # Counter is a subclass of the dictionary dict.
@@ -156,6 +161,8 @@ def read_raw_news(cfg, file_path, mode='train'):
             # split one line
             split_line = line.strip('\n').split('\t')
             news_id, category, subcategory, title, abstract, url, t_entity_str, _ = split_line
+            if cfg.genAbs and news_id in listGenKey:
+                title = genAbs[news_id][0]
             update_dict(target_dict=news_dict, key=news_id)
 
             # Entity
@@ -301,7 +308,7 @@ def prepare_news_graph(cfg, mode='train'):
         print(f"[{mode}] Finish News Graph Construction, \nGraph Path: {target_path} \nGraph Info: {data}")
     
     elif mode in ['test', 'val']:
-        origin_graph = torch.load(origin_graph_path)
+        origin_graph = torch.load(origin_graph_path, weights_only = False)
         edge_index = origin_graph.edge_index
         edge_attr = origin_graph.edge_attr
         node_feat = nltk_token_news
@@ -333,11 +340,11 @@ def prepare_neighbor_list(cfg, mode='train', target='news'):
     if target == 'news':
         target_graph_path = Path(data_dir[mode] ) / "nltk_news_graph.pt"
         target_dict = pickle.load(open(Path(data_dir[mode] ) / "news_dict.bin", "rb"))
-        graph_data = torch.load(target_graph_path)
+        graph_data = torch.load(target_graph_path, weights_only = False)
     elif target == 'entity':
         target_graph_path = Path(data_dir[mode] ) / "entity_graph.pt"
         target_dict = pickle.load(open(Path(data_dir[mode]) / "entity_dict.bin", "rb"))
-        graph_data = torch.load(target_graph_path)
+        graph_data = torch.load(target_graph_path, weights_only = False)
     else:
         assert False, f"[{mode}] Wrong target {target} "
 
@@ -380,7 +387,7 @@ def prepare_entity_graph(cfg, mode='train'):
 
     if mode == 'train':
         target_news_graph_path = Path(data_dir[mode]) / "nltk_news_graph.pt"
-        news_graph = torch.load(target_news_graph_path)
+        news_graph = torch.load(target_news_graph_path, weights_only = False)
         print("news_graph,", news_graph)
         entity_indices = news_graph.x[:, -8:-3].numpy()
         print("entity_indices, ", entity_indices.shape)
@@ -421,7 +428,7 @@ def prepare_entity_graph(cfg, mode='train'):
         torch.save(data, target_path)
         print(f"[{mode}] Finish Entity Graph Construction, \n Graph Path: {target_path} \nGraph Info: {data}")
     elif mode in ['val', 'test']:
-        origin_graph = torch.load(origin_graph_path)
+        origin_graph = torch.load(origin_graph_path, weights_only = False)
         edge_index = origin_graph.edge_index
         edge_attr = origin_graph.edge_attr
 

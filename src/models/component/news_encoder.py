@@ -14,11 +14,11 @@ import torch.nn as nn
 import numpy as np
 
 class NewsEncoder(nn.Module):
-    def __init__(self, embedding_matrix, num_category, num_subcategory):
+    def __init__(self, embedding_matrix, num_category, num_subcategory, num_words_title):
         super(NewsEncoder, self).__init__()
         self.embedding_matrix = embedding_matrix
         self.drop_rate = 0.2
-        self.num_words_title = 20
+        self.num_words_title = num_words_title
         self.use_category = True
         self.use_subcategory = True
         category_emb_dim = 100
