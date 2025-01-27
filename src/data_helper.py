@@ -38,11 +38,6 @@ def update_dict(target_dict, key, value=None):
             target_dict[key] = value
 
 
-def get_sample(all_elements, num_sample):
-    if num_sample > len(all_elements):
-        return random.sample(all_elements * (num_sample // len(all_elements) + 1), num_sample)
-    else:
-        return random.sample(all_elements, num_sample)
 
 def prepare_distributed_data(cfg, mode = "train"):
     # check

@@ -22,6 +22,11 @@ def set_random_seed(random_seed: int = 42) -> None:
 	torch.cuda.manual_seed(random_seed)
 	torch.backends.cudnn.benchmark = True
 
+def get_sample(all_elements, num_sample):
+    if num_sample > len(all_elements):
+        return random.sample(all_elements * (num_sample // len(all_elements) + 1), num_sample)
+    else:
+        return random.sample(all_elements, num_sample)
 
 def load_pretrain_emb(embedding_file_path, target_dict, target_dim):
 	embedding_matrix = np.random.rand(len(target_dict) + 1, target_dim)
