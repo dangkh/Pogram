@@ -37,7 +37,11 @@ def update_dict(target_dict, key, value=None):
         else:
             target_dict[key] = value
 
-
+def get_sample(all_elements, num_sample):
+    if num_sample > len(all_elements):
+        return random.sample(all_elements * (num_sample // len(all_elements) + 1), num_sample)
+    else:
+        return random.sample(all_elements, num_sample)
 
 def prepare_distributed_data(cfg, mode = "train"):
     # check
@@ -142,7 +146,8 @@ def read_raw_news(cfg, file_path, mode='train'):
             enrichedE = json.load(f)
 
     if cfg.genAbs:
-        with open(cfg.data_dir + '_train/genAbs.json', 'r') as f:
+        path = f"genAbs{cfg.absType}"
+        with open(cfg.data_dir + f'_train/{path}.json', 'r') as f:
             genAbs = json.load(f)
             listGenKey = list(genAbs.keys())
 

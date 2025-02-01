@@ -7,6 +7,16 @@ from src.data_helper import prepare_preprocessed_data
 from src.data_load import *
 from src.metrics import *
 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+import wandb
+parser = argparse.ArgumentParser()
+parser.add_argument("--use_graph", action="store_true", help="Enable graph usage (default: False)")
+parser.add_argument("--use_entity", action="store_true", help="Enable entity usage (default: False)")
+parser.add_argument("--use_EnrichE", action="store_true", help="Enable EnrichE usage (default: False)")
+parser.add_argument("--prototype", action="store_true", default=True, help="Enable prototype (default: True)")
+parser.add_argument("--genAbs", action="store_true", help="Enable abstract generation (default: False)")
+parser.add_argument("--absType", type=int, choices=[0, 1], default=0, help="Abstraction type: 0 for direct, 1 for via entity (default: 0)")
+args = parser.parse_args()
+
 
 def acc(y_true, y_hat):
 	y_hat = torch.argmax(y_hat, dim=-1)
@@ -47,6 +57,7 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 
 		# eval_acc = evaluate_modelPanel(model, cfg)
 		print(loss, accuary)
+		wandb.log({"acc": accuary, "loss": loss})
 		model.train()
 
 		
@@ -57,11 +68,39 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 			'loss': loss,  # Save loss or any other metric
 		}
 		# Save the checkpoint
-		torch.save(checkpoint, f'./checkpoint/{ep}use_graph{cfg.use_graph}_use_entity{cfg.use_graph}.pth')
+		torch.save(checkpoint, f'./checkpoint/{ep}_g{cfg.use_graph}_e1{cfg.use_entity}_e2{cfg.use_EnrichE}_abs{cfg.genAbs}_absType{cfg.absType}.pth')
 
-cfg = TrainConfig
 
+cfg = TrainConfig()
+
+cfg.update(args)
+if cfg.genAbs:
+	cfg.title_size = 50
+wandb.init(
+    # set the wandb project where this run will be logged
+    project="pogram",
+    # track hyperparameters and run metadata
+    config={
+    "learning_rate": cfg.learning_rate,
+    "epochs": cfg.epochs,
+    "use_graph": cfg.use_graph,
+    "use_entity" :cfg.use_entity,
+    "use_EnrichE" :cfg.use_EnrichE,
+    "prototype" :cfg.prototype,
+    "genAbs" :cfg.genAbs,
+    "absType": cfg.absType,
+    "his_size": cfg.his_size,
+    "history_size": cfg.history_size,
+    "batch_size": cfg.batch_size,
+    "num_neighbors":cfg.num_neighbors,
+    "head_num": cfg.head_num,
+    "k_hops" :cfg.k_hops,
+    "head_dim": cfg.head_dim,
+    "entity_emb_dim" :cfg.entity_emb_dim,
+    "entity_neighbors": cfg.entity_neighbors,
+    })
 logging.info("Start")
+
 set_random_seed(cfg.random_seed)
 """
 0. Definite Parameters & Functions
@@ -76,5 +115,14 @@ logging.info("Initialize Model")
 model, optimizer = load_model(cfg)
 print(model)
 logging.info("Training Start")
+# Count total parameters
+total_params = sum(p.numel() for p in model.parameters())
+# Count trainable parameters
+trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+print(f"Total Parameters: {total_params:,}")  # Format with commas for readability
+print(f"Trainable Parameters: {trainable_params:,}")
+
 train_modelPanel(model, optimizer, train_dataloader, cfg)
+
 logging.info("End")
+wandb.finish()

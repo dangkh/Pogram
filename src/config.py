@@ -1,6 +1,8 @@
 from dataclasses import dataclass
+from typing import Any, Dict
 
 @dataclass
+
 class TrainConfig:
     random_seed: int = 1009
     npratio: int = 4
@@ -11,11 +13,11 @@ class TrainConfig:
     learning_rate: float = 3e-4
     weight_decay: float = 1e-5
     max_len: int = 100
-    reprocess: bool = True
-    reprocess_neighbors : bool = True
+    reprocess: bool = False
+    reprocess_neighbors : bool = False
     data_dir: str = "./data/MINDsmall"
     gpu_num: int = 1
-    title_size: int = 50
+    title_size: int = 20
     abstract_size: int = 50
     entity_size: int = 5
     use_graph_type: int = 0 # adjacency connect or fully connect, fully set = 1
@@ -32,11 +34,22 @@ class TrainConfig:
     dropout_probability = 0.2
     his_size = 50
     k_hops = 1
-    num_neighbors = 8
+    num_neighbors = 4
     use_graph = False
     use_entity = False
     use_EnrichE = False
     early_stop_patience = 5
-    prototype = False
-    genAbs = True
+    prototype = True
+    genAbs = False 
+    absType = 0  # 0: direct; 1: via entity
     deviceIndex = 0
+
+    def update(self, args: Dict[str, Any]):
+        if isinstance(args, dict):
+            for key, value in args.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
+        else:
+            for key, value in vars(args).items():
+                if hasattr(self, key):
+                    setattr(self, key, value)

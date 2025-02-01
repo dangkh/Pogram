@@ -218,6 +218,7 @@ def load_dataloader(cfg, mode='train', model=None):
 		news_dataloader = DataLoader(news_dataset,  batch_size= 128)
 
 		news_scoring = []
+		model.eval()
 		with torch.no_grad():
 			for input_ids in tqdm(news_dataloader):
 				if cfg.use_entity:

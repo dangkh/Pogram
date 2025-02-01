@@ -169,10 +169,11 @@ class NAML(torch.nn.Module):
             self.entity_encoder = EntityEncoder(cfg)
 
         if cfg.use_graph:
-            self.gcn = GCNConv(400, 64)
-            self.gln = nn.Linear(64, 400)
-            # self.loc_glob_att = MultiHeadSelfAttention(self.news_dim, cfg.head_num , cfg.head_dim , cfg.head_dim)
-            self.loc_glob_att = AttentionPooling(self.news_dim, 128)
+            self.gcn = GCNConv(self.news_dim, 64)
+            self.gln = nn.Linear(64, self.news_dim)
+            self.loc_glob_att = MultiHeadSelfAttention(self.news_dim, cfg.head_num , cfg.head_dim , cfg.head_dim)
+            self.graph2newsDim = nn.Linear(cfg.head_dim*cfg.head_num, self.news_dim)
+            # self.loc_glob_att = AttentionPooling(self.news_dim, 128)
             self.glob_mean = global_mean_pool
             self.relu = nn.LeakyReLU(0.2)
 
@@ -222,11 +223,11 @@ class NAML(torch.nn.Module):
             user_vec = user_vec.view(-1, self.user_log_length, self.news_dim)
             
         user_vec = self.user_encoder(user_vec, history_mask)
-        if self.cfg.use_graph:
-            user_vec = torch.stack([user_vec, graph_vec], dim=1)
-            user_vec = self.loc_glob_att(user_vec)
-            # user_vec = self.loc_glob_att(user_vec, graph_vec, graph_vec).view(-1, self.news_dim)
-
+        # if self.cfg.use_graph:
+        #     # user_vec = torch.stack([user_vec, graph_vec], dim=1)
+        #     # user_vec = self.loc_glob_att(user_vec)
+        #     user_vec = self.loc_glob_att(graph_vec, user_vec, user_vec)
+        #     user_vec = self.graph2newsDim(user_vec).view(-1, self.news_dim)
         score = torch.bmm(candidate, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
         loss = self.loss_fn(score, label)
   
