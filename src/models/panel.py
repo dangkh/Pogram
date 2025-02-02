@@ -223,11 +223,11 @@ class NAML(torch.nn.Module):
             user_vec = user_vec.view(-1, self.user_log_length, self.news_dim)
             
         user_vec = self.user_encoder(user_vec, history_mask)
-        # if self.cfg.use_graph:
-        #     # user_vec = torch.stack([user_vec, graph_vec], dim=1)
-        #     # user_vec = self.loc_glob_att(user_vec)
-        #     user_vec = self.loc_glob_att(graph_vec, user_vec, user_vec)
-        #     user_vec = self.graph2newsDim(user_vec).view(-1, self.news_dim)
+        if self.cfg.use_graph:
+            # user_vec = torch.stack([user_vec, graph_vec], dim=1)
+            # user_vec = self.loc_glob_att(user_vec)
+            user_vec = self.loc_glob_att(graph_vec, user_vec, user_vec)
+            user_vec = self.graph2newsDim(user_vec).view(-1, self.news_dim)
         score = torch.bmm(candidate, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
         loss = self.loss_fn(score, label)
   
