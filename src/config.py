@@ -33,7 +33,7 @@ class TrainConfig:
     attention_hidden_dim = 200
     dropout_probability = 0.2
     his_size = 50
-    k_hops = 1
+    k_hops = 0
     num_neighbors = 4
     use_graph = False
     use_entity = False

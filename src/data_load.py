@@ -73,24 +73,24 @@ class Panel_TrainDataset(Dataset):
 		if uid not in self.listPrep:
 			click_docs = line[3].split()
 			click_docs = self.trans_to_nindex(click_docs)
-			k_hops_click = self.build_k_hop(click_docs)
+			# k_hops_click = self.build_k_hop(click_docs)
 			click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
 			user_feature = self.news_combined[click_docs]
 
 			if self.cfg.use_graph:
-				subemb = self.news_graph.x[k_hops_click]
-				sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
+				subemb = self.news_graph.x[click_docs]
+				sub_edge_index, sub_edge_attr = subgraph(click_docs, self.news_graph.edge_index, self.news_graph.edge_attr, \
 														relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
 				sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr)
-				self.prepDatabyUser.append([k_hops_click, sub_news_graph, user_feature, log_mask])
+				self.prepDatabyUser.append([click_docs, sub_news_graph, user_feature, log_mask])
 			else:
-				self.prepDatabyUser.append([k_hops_click, user_feature, log_mask])
+				self.prepDatabyUser.append([click_docs, user_feature, log_mask])
 			self.listPrep.append(uid)
 		else:
 			if self.cfg.use_graph:
-				k_hops_click, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
+				click_docs, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
 			else:	
-				k_hops_click, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
+				click_docs, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
 		
 		sess_pos = line[4].split()
 		sess_neg = line[5].split()
@@ -101,11 +101,14 @@ class Panel_TrainDataset(Dataset):
 		sample_news = neg[:label] + pos + neg[label:]
 		news_feature = self.news_combined[sample_news]
 
-		return k_hops_click, [uid, torch.from_numpy(news_feature), torch.tensor(label)]
+		return click_docs, [uid, torch.from_numpy(news_feature), torch.tensor(label)]
 
 
 	def __getitem__(self, idx):
-		k_hops_click, [uid, news_feature, label] =  self.preprocessDT[idx]
+		click_docs, [uid, news_feature, label] =  self.preprocessDT[idx]
+		print("#"*100)
+		print(len(click_docs))
+		print("-"*100)
 		sub_news_graph = []
 		if self.cfg.use_graph:
 			_, sub_news_graph, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
@@ -145,27 +148,27 @@ class Panel_ValidDataset(Panel_TrainDataset):
 			user_feature = self.news_score[click_docs]
 
 			if self.cfg.use_graph:
-				subemb = torch.from_numpy(self.news_score[k_hops_click])
+				subemb = torch.from_numpy(self.news_score[click_docs])
 				if self.cfg.use_entity:
 					subemb = subemb[:, :-5]
-				sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
+				sub_edge_index, sub_edge_attr = subgraph(click_docs, self.news_graph.edge_index, self.news_graph.edge_attr, \
 														relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
 				sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr)
-				self.prepDatabyUser.append([k_hops_click, sub_news_graph, user_feature, log_mask])
+				self.prepDatabyUser.append([click_docs, sub_news_graph, user_feature, log_mask])
 			else:
-				self.prepDatabyUser.append([k_hops_click, user_feature, log_mask])
+				self.prepDatabyUser.append([click_docs, user_feature, log_mask])
 			self.listPrep.append(uid)
 		else:
 			if self.cfg.use_graph:
-				k_hops_click, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
+				click_docs, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
 			else:	
-				k_hops_click, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
+				click_docs, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
 
 		candidate_news = self.trans_to_nindex([i.split('-')[0] for i in line[4].split()])
 		label = np.array([int(i.split('-')[1]) for i in line[4].split()])
 		news_feature = self.news_score[candidate_news]
 
-		return k_hops_click, [uid, torch.from_numpy(news_feature), torch.tensor(label)]
+		return click_docs, [uid, torch.from_numpy(news_feature), torch.tensor(label)]
 
 
 

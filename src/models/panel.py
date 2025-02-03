@@ -190,9 +190,9 @@ class NAML(torch.nn.Module):
             graph_batch, history, history_mask, candidate, label = args
             graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
             graph_vec = self.news_encoder(graph_vec)
-            graph_vec = self.gcn(graph_vec, edge_index)
-            graph_vec = self.gln(graph_vec)
-            graph_vec = self.relu(graph_vec)
+            # graph_vec = self.gcn(graph_vec, edge_index)
+            # graph_vec = self.gln(graph_vec)
+            # graph_vec = self.relu(graph_vec)
             graph_vec = self.glob_mean(graph_vec, batch)
         else:
             _, history, history_mask, candidate, label = args
@@ -222,7 +222,9 @@ class NAML(torch.nn.Module):
             user_vec = self.user_att(torch.stack([user_vec, e_his], dim=2).view(-1, 2, self.news_dim))
             user_vec = user_vec.view(-1, self.user_log_length, self.news_dim)
             
-        user_vec = self.user_encoder(user_vec, history_mask)
+        # user_vec = self.user_encoder(user_vec, history_mask)
+        user_vec = torch.mean(user_vec, 1)
+        
         if self.cfg.use_graph:
             # user_vec = torch.stack([user_vec, graph_vec], dim=1)
             # user_vec = self.loc_glob_att(user_vec)

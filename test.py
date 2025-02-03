@@ -52,12 +52,14 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 	for cnt, (graph_batch, [log_vecs, log_mask, news_vecs, labels]) in tqdm(enumerate(valid_dataloader)):
 		log_vecs = log_vecs.cuda()
 		log_mask = log_mask.cuda()
-
 		if cfg.use_graph:
+			print("debug:")
+			print("*"*100)
 			graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
-			graph_vec = model.gcn(graph_vec, edge_index)
-			graph_vec = model.gln(graph_vec)
-			graph_vec = model.relu(graph_vec)
+			print(graph_vec.shape)
+			# graph_vec = model.gcn(graph_vec, edge_index)
+			# graph_vec = model.gln(graph_vec)
+			# graph_vec = model.relu(graph_vec)
 			graph_vec = model.glob_mean(graph_vec, batch)
 
 		if cfg.use_entity:
@@ -80,9 +82,15 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 
 		else:
 			user_vecs = log_vecs.view(-1, model.user_log_length, model.news_dim)
-
+		log_mask = log_mask[0].int().bool()
+		selected_rows = user_vecs[:,log_mask]
+		print(selected_rows.shape, graph_vec.shape)
+		selected_rows = torch.mean(selected_rows, 1)
+		print(selected_rows - graph_vec)
+		stop
 		
-		user_vecs = model.user_encoder(user_vecs, log_mask)
+		# user_vecs = model.user_encoder(user_vecs, log_mask)
+		user_vecs = torch.mean(user_vecs, 1)
 		if cfg.use_graph:
 			# user_vecs = torch.stack([user_vecs, graph_vec], dim=1)
 			# user_vecs = model.loc_glob_att(user_vecs)
@@ -114,7 +122,7 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 		"ndcg5": reduced_ndcg5,
 		"ndcg10": reduced_ndcg10,
 	}
-	wandb.log(res)
+	# wandb.log(res)
 	print(res)
 	
 	return res
@@ -138,30 +146,30 @@ cfg = TrainConfig()
 cfg.update(args)
 if cfg.genAbs:
 	cfg.title_size = 50
-wandb.init(
-	# set the wandb project where this run will be logged
-	project="pogram",
-	# track hyperparameters and run metadata
-	config={
-	"learning_rate": cfg.learning_rate,
-	"epochs": cfg.epochs,
-	"use_graph": cfg.use_graph,
-	"use_entity" :cfg.use_entity,
-	"use_EnrichE" :cfg.use_EnrichE,
-	"prototype" :cfg.prototype,
-	"genAbs" :cfg.genAbs,
-	"absType": cfg.absType,
-	"his_size": cfg.his_size,
-	"history_size": cfg.history_size,
-	"batch_size": cfg.batch_size,
-	"num_neighbors":cfg.num_neighbors,
-	"head_num": cfg.head_num,
-	"k_hops" :cfg.k_hops,
-	"head_dim": cfg.head_dim,
-	"entity_emb_dim" :cfg.entity_emb_dim,
-	"entity_neighbors": cfg.entity_neighbors,
-	"checknum": args.checknum
-	})
+# wandb.init(
+# 	# set the wandb project where this run will be logged
+# 	project="pogram",
+# 	# track hyperparameters and run metadata
+# 	config={
+# 	"learning_rate": cfg.learning_rate,
+# 	"epochs": cfg.epochs,
+# 	"use_graph": cfg.use_graph,
+# 	"use_entity" :cfg.use_entity,
+# 	"use_EnrichE" :cfg.use_EnrichE,
+# 	"prototype" :cfg.prototype,
+# 	"genAbs" :cfg.genAbs,
+# 	"absType": cfg.absType,
+# 	"his_size": cfg.his_size,
+# 	"history_size": cfg.history_size,
+# 	"batch_size": cfg.batch_size,
+# 	"num_neighbors":cfg.num_neighbors,
+# 	"head_num": cfg.head_num,
+# 	"k_hops" :cfg.k_hops,
+# 	"head_dim": cfg.head_dim,
+# 	"entity_emb_dim" :cfg.entity_emb_dim,
+# 	"entity_neighbors": cfg.entity_neighbors,
+# 	"checknum": args.checknum
+# 	})
 logging.info("Start")
 set_random_seed(cfg.random_seed)
 
@@ -180,4 +188,4 @@ else:
 
 
 logging.info("End")
-wandb.finish()
+# wandb.finish()
