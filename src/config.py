@@ -24,25 +24,25 @@ class TrainConfig:
     directed: bool = False
     model_name: str = "GLORY"
     entity_global: bool = False
-    glove_path = './data/glove.840B.300d.txt'
-    word_emb_dim = 300
-    head_num = 4
-    head_dim = 100
-    entity_emb_dim = 100
-    entity_neighbors = 10
-    attention_hidden_dim = 200
-    dropout_probability = 0.2
-    his_size = 50
-    k_hops = 0
-    num_neighbors = 4
-    use_graph = False
-    use_entity = False
-    use_EnrichE = False
-    early_stop_patience = 5
-    prototype = True
-    genAbs = False 
-    absType = 0  # 0: direct; 1: via entity
-    deviceIndex = 0
+    glove_path: str = './data/glove.840B.300d.txt'
+    word_emb_dim : int =300
+    head_num: int = 4
+    head_dim: int = 100
+    entity_emb_dim : int =100
+    entity_neighbors : int =10
+    attention_hidden_dim: int = 200
+    dropout_probability: float = 0.2
+    his_size : int =50
+    k_hops: int = 0
+    num_neighbors : int =4
+    use_graph : bool =False
+    use_entity : bool =False
+    use_EnrichE: bool = False
+    early_stop_patience: int = 5
+    prototype: bool = True
+    genAbs : bool =False 
+    absType: int = 0  # 0: direct; 1: via entity
+    deviceIndex : int =0
 
     def update(self, args: Dict[str, Any]):
         if isinstance(args, dict):

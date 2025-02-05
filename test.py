@@ -18,7 +18,7 @@ parser.add_argument('--checknum', type=int, default=4, help=f'')
 parser.add_argument("--use_graph", action="store_true", help="Enable graph usage (default: False)")
 parser.add_argument("--use_entity", action="store_true", help="Enable entity usage (default: False)")
 parser.add_argument("--use_EnrichE", action="store_true", help="Enable EnrichE usage (default: False)")
-parser.add_argument("--prototype", action="store_true", default=True, help="Enable prototype (default: True)")
+parser.add_argument("--prototype", action="store_false", default=True, help="Enable prototype (default: True)")
 parser.add_argument("--genAbs", action="store_true", help="Enable abstract generation (default: False)")
 parser.add_argument("--absType", type=int, choices=[0, 1], default=0, help="Abstraction type: 0 for direct, 1 for via entity (default: 0)")
 args = parser.parse_args()
@@ -49,18 +49,20 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 	MRR = []
 	nDCG5 = []
 	nDCG10 = []
-	for cnt, (graph_batch, [log_vecs, log_mask, news_vecs, labels]) in tqdm(enumerate(valid_dataloader)):
+	for cnt, (graph_vec, [log_vecs, log_mask, news_vecs, labels]) in tqdm(enumerate(valid_dataloader)):
 		log_vecs = log_vecs.cuda()
 		log_mask = log_mask.cuda()
 		if cfg.use_graph:
-			print("debug:")
-			print("*"*100)
-			graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
-			print(graph_vec.shape)
+			# graph_vec = graph_vec.cuda()
+			# graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
+			# originShape = graph_vec.shape[0]
+			graph_vec = graph_vec.reshape(-1, log_vecs.shape[-1])
+			graph_vec = model.news_encoder(graph_vec).reshape(-1, model.user_log_length, model.news_dim)
+			graph_vec = torch.mean(graph_vec, 1)
 			# graph_vec = model.gcn(graph_vec, edge_index)
 			# graph_vec = model.gln(graph_vec)
 			# graph_vec = model.relu(graph_vec)
-			graph_vec = model.glob_mean(graph_vec, batch)
+			# graph_vec = model.glob_mean(graph_vec, batch)
 
 		if cfg.use_entity:
 			news_vecs = news_vecs.cuda()
@@ -82,20 +84,20 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 
 		else:
 			user_vecs = log_vecs.view(-1, model.user_log_length, model.news_dim)
-		log_mask = log_mask[0].int().bool()
-		selected_rows = user_vecs[:,log_mask]
-		print(selected_rows.shape, graph_vec.shape)
-		selected_rows = torch.mean(selected_rows, 1)
-		print(selected_rows - graph_vec)
-		stop
-		
-		# user_vecs = model.user_encoder(user_vecs, log_mask)
-		user_vecs = torch.mean(user_vecs, 1)
+		# log_mask = log_mask[0].int().bool()
+		# selected_rows = user_vecs[:,log_mask]
+		# selected_rows = torch.mean(selected_rows, 1)
+		# if originShape <= 50:
+		# 	print(torch.sum(selected_rows - graph_vec))
+		# stop
+		user_vecs = model.user_encoder(user_vecs, log_mask)
+		# user_vecs = torch.mean(user_vecs, 1)
 		if cfg.use_graph:
-			# user_vecs = torch.stack([user_vecs, graph_vec], dim=1)
-			# user_vecs = model.loc_glob_att(user_vecs)
-			user_vecs = model.loc_glob_att(graph_vec, user_vecs, user_vecs)
-			user_vecs = model.graph2newsDim(user_vecs).view(-1, model.news_dim)
+			graph_vec = model.loc_glob_att(graph_vec, user_vecs, user_vecs)
+			graph_vec = model.graph2newsDim(graph_vec).view(-1, model.news_dim)
+			graph_vec = model.relu(graph_vec)
+			user_vecs = torch.stack([graph_vec, user_vecs], dim=1)
+			user_vecs = model.loc_glob_att2(user_vecs)
 
 		user_vecs = user_vecs.detach().cpu().numpy()
 		
@@ -115,6 +117,7 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 			MRR.append(mrr)
 			nDCG5.append(ndcg5)
 			nDCG10.append(ndcg10)
+
 	reduced_auc, reduced_mrr, reduced_ndcg5, reduced_ndcg10 = get_mean([AUC, MRR, nDCG5, nDCG10])
 	res = {
 		"auc": reduced_auc,

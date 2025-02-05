@@ -51,8 +51,6 @@ class NewsEncoder(nn.Module):
                               p=self.drop_rate,
                               training=self.training)
         context_word_vecs = self.cnn(word_vecs.transpose(1, 2)).transpose(1, 2)
-        # context_word_vecs = self.cnn(word_vecs.transpose(1, 2)).transpose(1, 2)
-        # stop
         title_vecs = self.lnorm(self.attn(context_word_vecs, mask))
         all_vecs = [title_vecs]
 
