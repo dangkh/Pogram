@@ -27,8 +27,7 @@ class Panel_TrainDataset(Dataset):
 		self.npratio = cfg.npratio
 		self.cfg = cfg
 		self.neighbor_dict = neighbor_dict
-		self.news_graph = news_graph
-		self.news_graph.x = self.news_graph.x.float()
+		self.news_graph = Data(x=news_graph.x.float(), edge_index=news_graph.edge_index, edge_attr=news_graph.edge_attr)
 		self.listPrep = []
 		self.prepDatabyUser = []
 		self.prepare()
@@ -60,10 +59,10 @@ class Panel_TrainDataset(Dataset):
 		self.preprocessDT = []
 		with open(self.filename) as f:
 			for line in tqdm(f):
-				uid, dt = self.line_mapper(line)
-				if len(uid) == 0:
+				k_hops_click, dt = self.line_mapper(line)
+				if len(k_hops_click) == 0:
 					continue
-				self.preprocessDT.append([uid,dt])
+				self.preprocessDT.append([k_hops_click,dt])
 				if self.cfg.prototype and (len(self.preprocessDT) > 10000):
 					break
 	
@@ -127,8 +126,7 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		self.npratio = cfg.npratio
 		self.cfg = cfg
 		self.neighbor_dict = neighbor_dict
-		self.news_graph = news_graph
-		self.news_graph.x = self.news_graph.x.float()
+		self.news_graph = Data(x=news_graph.x.float(), edge_index=news_graph.edge_index, edge_attr=news_graph.edge_attr)
 		self.listPrep = []
 		self.prepDatabyUser = []
 		self.prepare()

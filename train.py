@@ -9,10 +9,11 @@ from src.metrics import *
 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 import wandb
 parser = argparse.ArgumentParser()
+parser.add_argument("--reprocess", action="store_true", help="Enable entity usage (default: False)")
 parser.add_argument("--use_graph", action="store_true", help="Enable graph usage (default: False)")
 parser.add_argument("--use_entity", action="store_true", help="Enable entity usage (default: False)")
 parser.add_argument("--use_EnrichE", action="store_true", help="Enable EnrichE usage (default: False)")
-parser.add_argument("--prototype", action="store_true", default=True, help="Enable prototype (default: True)")
+parser.add_argument("--prototype", action="store_false", default=True, help="Enable prototype (default: True)")
 parser.add_argument("--genAbs", action="store_true", help="Enable abstract generation (default: False)")
 parser.add_argument("--absType", type=int, choices=[0, 1], default=0, help="Abstraction type: 0 for direct, 1 for via entity (default: 0)")
 args = parser.parse_args()
