@@ -10,6 +10,7 @@ import collections
 from nltk.tokenize import word_tokenize
 from torch_geometric.data import Data
 from torch_geometric.utils import to_undirected
+from torch_geometric.utils import add_self_loops
 import nltk
 nltk.download('punkt')
     
@@ -36,7 +37,6 @@ def update_dict(target_dict, key, value=None):
             target_dict[key] = len(target_dict) + 1
         else:
             target_dict[key] = value
-
 
 def get_sample(all_elements, num_sample):
     if num_sample > len(all_elements):
@@ -147,7 +147,8 @@ def read_raw_news(cfg, file_path, mode='train'):
             enrichedE = json.load(f)
 
     if cfg.genAbs:
-        with open(cfg.data_dir + '_train/genAbs.json', 'r') as f:
+        path = f"genAbs{cfg.absType}"
+        with open(cfg.data_dir + f'_train/{path}.json', 'r') as f:
             genAbs = json.load(f)
             listGenKey = list(genAbs.keys())
 
@@ -298,7 +299,7 @@ def prepare_news_graph(cfg, mode='train'):
 
         edge_index = torch.tensor(list(zip(*unique_edges)), dtype=torch.long)
         edge_attr = torch.tensor([edge_weights[edge] for edge in unique_edges], dtype=torch.long)
-
+        edge_index, edge_attr = add_self_loops(edge_index, edge_attr)
         data = Data(x=torch.from_numpy(node_feat),
                 edge_index=edge_index, edge_attr=edge_attr,
                 num_nodes=num_nodes)
@@ -312,7 +313,7 @@ def prepare_news_graph(cfg, mode='train'):
         edge_index = origin_graph.edge_index
         edge_attr = origin_graph.edge_attr
         node_feat = nltk_token_news
-
+        edge_index, edge_attr = add_self_loops(edge_index, edge_attr)
         data = Data(x=torch.from_numpy(node_feat),
                     edge_index=edge_index, edge_attr=edge_attr,
                     num_nodes=len(news_dict) + 1)
@@ -455,13 +456,13 @@ def prepare_preprocessed_data(cfg)  -> None:
     prepare_neighbor_list(cfg, 'val', 'news')
     # prepare_neighbor_list(cfg, 'test', 'news')
 
-    prepare_entity_graph(cfg, 'train')
-    prepare_entity_graph(cfg, 'val')
-    # prepare_entity_graph(cfg, 'test')
+    # prepare_entity_graph(cfg, 'train')
+    # prepare_entity_graph(cfg, 'val')
+    # # prepare_entity_graph(cfg, 'test')
 
-    prepare_neighbor_list(cfg, 'train', 'entity')
-    prepare_neighbor_list(cfg, 'val', 'entity')
-    # prepare_neighbor_list(cfg, 'test', 'entity')
+    # prepare_neighbor_list(cfg, 'train', 'entity')
+    # prepare_neighbor_list(cfg, 'val', 'entity')
+    # # prepare_neighbor_list(cfg, 'test', 'entity')
 
     # # Entity vec process
     data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}

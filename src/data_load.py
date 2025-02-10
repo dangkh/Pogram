@@ -13,6 +13,7 @@ from torch.utils.data import IterableDataset, Dataset
 from torch_geometric.data import Data, Batch
 from torch_geometric.utils import subgraph
 from torch_geometric.loader import DataLoader as GraphDataLoader
+from torch_geometric.utils import add_self_loops
 
 import random
 device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -27,8 +28,7 @@ class Panel_TrainDataset(Dataset):
 		self.npratio = cfg.npratio
 		self.cfg = cfg
 		self.neighbor_dict = neighbor_dict
-		self.news_graph = news_graph
-		self.news_graph.x = self.news_graph.x.float()
+		self.news_graph = Data(x=news_graph.x.float(), edge_index=news_graph.edge_index, edge_attr=news_graph.edge_attr)
 		self.listPrep = []
 		self.prepDatabyUser = []
 		self.prepare()
@@ -54,26 +54,29 @@ class Panel_TrainDataset(Dataset):
 				current_hop_idx.extend(self.neighbor_dict[news_idx][:self.cfg.num_neighbors])
 			source_idx = current_hop_idx
 			click_idx.extend(current_hop_idx)
+		click_idx.append(0)
 		return list(set(click_idx))
 		
 	def prepare(self):
 		self.preprocessDT = []
 		with open(self.filename) as f:
 			for line in tqdm(f):
-				uid, dt = self.line_mapper(line)
-				if len(uid) == 0:
+				k_hops_click, dt = self.line_mapper(line)
+				if len(k_hops_click) == 0:
 					continue
-				self.preprocessDT.append([uid,dt])
+				self.preprocessDT.append([k_hops_click,dt])
 				if self.cfg.prototype and (len(self.preprocessDT) > 10000):
 					break
 	
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
 		uid = line[1]
+		mapId = np.asarray([0])
 		if uid not in self.listPrep:
 			click_docs = line[3].split()
 			click_docs = self.trans_to_nindex(click_docs)
 			k_hops_click = self.build_k_hop(click_docs)
+			origin_graph = click_docs
 			click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
 			user_feature = self.news_combined[click_docs]
 
@@ -81,14 +84,16 @@ class Panel_TrainDataset(Dataset):
 				subemb = self.news_graph.x[k_hops_click]
 				sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
 														relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
+				sub_edge_index, sub_edge_attr = add_self_loops(sub_edge_index, sub_edge_attr, fill_value = 100)
 				sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr)
-				self.prepDatabyUser.append([k_hops_click, sub_news_graph, user_feature, log_mask])
+				mapId = np.asarray([k_hops_click.index(x) for x in click_docs])
+				self.prepDatabyUser.append([k_hops_click, mapId, sub_news_graph, user_feature, log_mask])
 			else:
 				self.prepDatabyUser.append([k_hops_click, user_feature, log_mask])
 			self.listPrep.append(uid)
 		else:
 			if self.cfg.use_graph:
-				k_hops_click, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
+				k_hops_click, mapId, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
 			else:	
 				k_hops_click, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
 		
@@ -97,22 +102,22 @@ class Panel_TrainDataset(Dataset):
 		pos = self.trans_to_nindex(sess_pos)
 		neg = self.trans_to_nindex(sess_neg)
 
-		label = random.randint(0, self.npratio)
+		label = torch.tensor(random.randint(0, self.npratio))
 		sample_news = neg[:label] + pos + neg[label:]
 		news_feature = self.news_combined[sample_news]
 
-		return k_hops_click, [uid, torch.from_numpy(news_feature), torch.tensor(label)]
+		return k_hops_click, [uid, mapId, news_feature, label]
 
 
 	def __getitem__(self, idx):
-		k_hops_click, [uid, news_feature, label] =  self.preprocessDT[idx]
+		k_hops_click, [uid, mapId, news_feature, label] =  self.preprocessDT[idx]
 		sub_news_graph = []
 		if self.cfg.use_graph:
-			_, sub_news_graph, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
+			_, mapId, sub_news_graph, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
 			sub_news_graph = sub_news_graph.to(device)
 		else:	
 			_, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
-		return sub_news_graph, [torch.from_numpy(user_feature), torch.from_numpy(log_mask), news_feature, label]
+		return sub_news_graph, [torch.from_numpy(mapId), torch.from_numpy(user_feature), torch.from_numpy(log_mask), torch.from_numpy(news_feature), label]
 
 	def __len__(self):
 		return len(self.preprocessDT)
@@ -127,8 +132,7 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		self.npratio = cfg.npratio
 		self.cfg = cfg
 		self.neighbor_dict = neighbor_dict
-		self.news_graph = news_graph
-		self.news_graph.x = self.news_graph.x.float()
+		self.news_graph = Data(x=news_graph.x.float(), edge_index=news_graph.edge_index, edge_attr=news_graph.edge_attr)
 		self.listPrep = []
 		self.prepDatabyUser = []
 		self.prepare()
@@ -137,6 +141,7 @@ class Panel_ValidDataset(Panel_TrainDataset):
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
 		uid = line[1]
+		mapId = np.asarray([0])
 		if uid not in self.listPrep:
 			click_docs = line[3].split()
 			click_docs = self.trans_to_nindex(click_docs)
@@ -145,27 +150,29 @@ class Panel_ValidDataset(Panel_TrainDataset):
 			user_feature = self.news_score[click_docs]
 
 			if self.cfg.use_graph:
-				subemb = torch.from_numpy(self.news_score[k_hops_click])
+				subemb = self.news_score[k_hops_click]
 				if self.cfg.use_entity:
 					subemb = subemb[:, :-5]
 				sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
 														relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
+				sub_edge_index, sub_edge_attr = add_self_loops(sub_edge_index, sub_edge_attr, fill_value = 100)
 				sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr)
-				self.prepDatabyUser.append([k_hops_click, sub_news_graph, user_feature, log_mask])
+				mapId = np.asarray([k_hops_click.index(x) for x in click_docs])
+				self.prepDatabyUser.append([k_hops_click, mapId, sub_news_graph, user_feature, log_mask])
 			else:
 				self.prepDatabyUser.append([k_hops_click, user_feature, log_mask])
 			self.listPrep.append(uid)
 		else:
 			if self.cfg.use_graph:
-				k_hops_click, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
+				k_hops_click, mapId, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
 			else:	
 				k_hops_click, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
 
 		candidate_news = self.trans_to_nindex([i.split('-')[0] for i in line[4].split()])
-		label = np.array([int(i.split('-')[1]) for i in line[4].split()])
+		label = torch.tensor(np.array([int(i.split('-')[1]) for i in line[4].split()]))
 		news_feature = self.news_score[candidate_news]
-
-		return k_hops_click, [uid, torch.from_numpy(news_feature), torch.tensor(label)]
+		
+		return k_hops_click, [uid, mapId, news_feature, label]
 
 
 
@@ -218,6 +225,7 @@ def load_dataloader(cfg, mode='train', model=None):
 		news_dataloader = DataLoader(news_dataset,  batch_size= 128)
 
 		news_scoring = []
+		model.eval()
 		with torch.no_grad():
 			for input_ids in tqdm(news_dataloader):
 				if cfg.use_entity:

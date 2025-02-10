@@ -1,13 +1,15 @@
 from dataclasses import dataclass
+from typing import Any, Dict
 
 @dataclass
+
 class TrainConfig:
     random_seed: int = 1009
     npratio: int = 4
     history_size: int = 50
     batch_size: int = 128
     gradient_accumulation_steps: int = 8  # batch_size = 16 x 8 = 128
-    epochs: int = 5
+    epochs: int = 6
     learning_rate: float = 3e-4
     weight_decay: float = 1e-5
     max_len: int = 100
@@ -22,20 +24,32 @@ class TrainConfig:
     directed: bool = False
     model_name: str = "GLORY"
     entity_global: bool = False
-    glove_path = './data/glove.840B.300d.txt'
-    word_emb_dim = 300
-    head_num = 4
-    head_dim = 100
-    entity_emb_dim = 100
-    entity_neighbors = 10
-    attention_hidden_dim = 200
-    dropout_probability = 0.2
-    his_size = 50
-    k_hops = 1
-    num_neighbors = 8
-    use_graph = True
-    use_entity = False
-    use_EnrichE = False
-    early_stop_patience = 5
-    prototype = True
-    genAbs = False
+    glove_path: str = './data/glove.840B.300d.txt'
+    word_emb_dim : int = 300
+    head_num: int = 4
+    head_dim: int = 100
+    entity_emb_dim : int = 100
+    entity_neighbors : int = 10
+    attention_hidden_dim: int = 200
+    dropout_probability: float = 0.2
+    his_size : int = 50
+    k_hops: int = 1
+    num_neighbors : int = 4
+    use_graph : bool = False
+    use_entity : bool = False
+    use_EnrichE: bool = False
+    early_stop_patience: int = 5
+    prototype: bool = True
+    genAbs : bool = False 
+    absType: int = 0  # 0: direct; 1: via entity
+    deviceIndex : int = 0
+
+    def update(self, args: Dict[str, Any]):
+        if isinstance(args, dict):
+            for key, value in args.items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
+        else:
+            for key, value in vars(args).items():
+                if hasattr(self, key):
+                    setattr(self, key, value)
