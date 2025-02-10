@@ -35,14 +35,18 @@ class NAML(torch.nn.Module):
             self.entity_encoder = EntityEncoder(cfg)
 
         if cfg.use_graph:
-            self.gnn1 = GCNConv(self.news_dim, 128)
-            self.gnn2 = GCNConv(64, 64)
-            self.gln = nn.Linear(128, self.news_dim)
+            self.g_hidden_dim = 64
+            self.gnn1 = GCNConv(self.news_dim, self.g_hidden_dim)
+            self.gnn2 = GCNConv(self.g_hidden_dim, self.g_hidden_dim)
+            self.gnn3 = GCNConv(self.g_hidden_dim, self.g_hidden_dim)
+            self.gln = nn.Linear(self.g_hidden_dim, self.news_dim)
             self.loc_glob_att = MultiHeadSelfAttention(self.news_dim, cfg.head_num , cfg.head_dim , cfg.head_dim)
             self.graph2newsDim = nn.Linear(cfg.head_dim*cfg.head_num, self.news_dim)
             self.loc_glob_att2 = AttentionPooling(self.news_dim, 128)
             self.glob_mean = global_mean_pool
             self.relu = nn.LeakyReLU(0.2)
+            self.gnorm = nn.LayerNorm(self.g_hidden_dim)
+            self.user_attg = AttentionPooling(self.news_dim, cfg.attention_hidden_dim)
 
         self.loss_fn = nn.CrossEntropyLoss()
 
@@ -54,18 +58,23 @@ class NAML(torch.nn.Module):
             label: batch_size, 1+K
         '''
         if self.cfg.use_graph:
-            graph_batch, history, history_mask, candidate, label = args
+            graph_batch, mapId, history, history_mask, candidate, label = args
             graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
             graph_vec = self.news_encoder(graph_vec)
             graph_vec = self.gnn1(graph_vec, edge_index)
+            graph_vec = self.relu(graph_vec)
+            graph_vec = self.gnn2(graph_vec, edge_index)
+            graph_vec = self.relu(graph_vec)
+            # graph_vec = self.gnn3(graph_vec, edge_index)
             # graph_vec = self.relu(graph_vec)
-            # graph_vec = self.gnn2(graph_vec, edge_index)
-            # graph_vec = self.relu(graph_vec)
+            # graph_vec = self.gnorm(graph_vec)
             graph_vec = self.gln(graph_vec)
             graph_vec = self.relu(graph_vec)
+            graphBYuser = graph_vec[mapId.view(-1)]
+            graphBYuser = graphBYuser.view(-1, self.user_log_length, self.news_dim)
             graph_vec = self.glob_mean(graph_vec, batch)
         else:
-            _, history, history_mask, candidate, label = args
+            _, _, history, history_mask, candidate, label = args
         
         if self.cfg.use_entity:
             e_his = history[:,:,-5:]
@@ -91,14 +100,18 @@ class NAML(torch.nn.Module):
             candidate = candidate.view(-1, self.npratio+1, self.news_dim)
             user_vec = self.user_att(torch.stack([user_vec, e_his], dim=2).view(-1, 2, self.news_dim))
             user_vec = user_vec.view(-1, self.user_log_length, self.news_dim)
+        
+        if self.cfg.use_graph:
+            user_vec = self.user_attg(torch.stack([user_vec, graphBYuser], dim=2).view(-1, 2, self.news_dim))
+            user_vec = user_vec.view(-1, self.user_log_length, self.news_dim)
             
         user_vec = self.user_encoder(user_vec, history_mask)
-        if self.cfg.use_graph:
-            graph_vec = self.loc_glob_att(graph_vec, user_vec, user_vec)
-            graph_vec = self.graph2newsDim(graph_vec).view(-1, self.news_dim)
-            graph_vec = self.relu(graph_vec)
-            user_vec = torch.stack([user_vec, graph_vec], dim=1)
-            user_vec = self.loc_glob_att2(user_vec)
+        # if self.cfg.use_graph:
+        #     graph_vec = self.loc_glob_att(graph_vec, user_vec, user_vec)
+        #     graph_vec = self.graph2newsDim(graph_vec).view(-1, self.news_dim)
+        #     graph_vec = self.relu(graph_vec)
+        #     user_vec = torch.stack([user_vec, graph_vec], dim=1)
+        #     user_vec = self.loc_glob_att2(user_vec)
         score = torch.bmm(candidate, user_vec.unsqueeze(dim=-1)).squeeze(dim=-1)
         loss = self.loss_fn(score, label)
   

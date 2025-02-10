@@ -50,18 +50,23 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 	MRR = []
 	nDCG5 = []
 	nDCG10 = []
-	for cnt, (graph_batch, [log_vecs, log_mask, news_vecs, labels]) in tqdm(enumerate(valid_dataloader)):
+	for cnt, (graph_batch, [mapId, log_vecs, log_mask, news_vecs, labels]) in tqdm(enumerate(valid_dataloader)):
 		log_vecs = log_vecs.cuda()
 		log_mask = log_mask.cuda()
 
 		if cfg.use_graph:
 			graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
 			graph_vec = model.gnn1(graph_vec, edge_index)
-			# graph_vec = model.relu(graph_vec)
-			# graph_vec = model.gnn2(graph_vec, edge_index)
-			# graph_vec = model.relu(graph_vec)
+			graph_vec = model.relu(graph_vec)
+			graph_vec = model.gnn2(graph_vec, edge_index)
+			graph_vec = model.relu(graph_vec)
+			# graph_vec = model.gnn3(graph_vec, edge_index)
+			# graph_vec = model.relu(graph_vec)			
+			# graph_vec = model.gnorm(graph_vec)			
 			graph_vec = model.gln(graph_vec)
 			graph_vec = model.relu(graph_vec)
+			graphBYuser = graph_vec[mapId.view(-1)]
+			graphBYuser = graphBYuser.view(-1, model.user_log_length, model.news_dim)
 			graph_vec = model.glob_mean(graph_vec, batch)
 
 		if cfg.use_entity:
@@ -85,14 +90,17 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 		else:
 			user_vecs = log_vecs.view(-1, model.user_log_length, model.news_dim)
 
-		
-		user_vecs = model.user_encoder(user_vecs, log_mask)
 		if cfg.use_graph:
-			graph_vec = model.loc_glob_att(graph_vec, user_vecs, user_vecs)
-			graph_vec = model.graph2newsDim(graph_vec).view(-1, model.news_dim)
-			graph_vec = model.relu(graph_vec)
-			user_vecs = torch.stack([user_vecs, graph_vec], dim=1)
-			user_vecs = model.loc_glob_att2(user_vecs)
+			user_vecs = model.user_attg(torch.stack([user_vecs, graphBYuser], dim=2).view(-1, 2, model.news_dim))
+			user_vecs = user_vecs.view(-1, model.user_log_length, model.news_dim)
+
+		user_vecs = model.user_encoder(user_vecs, log_mask)
+		# if cfg.use_graph:
+		# 	graph_vec = model.loc_glob_att(graph_vec, user_vecs, user_vecs)
+		# 	graph_vec = model.graph2newsDim(graph_vec).view(-1, model.news_dim)
+		# 	graph_vec = model.relu(graph_vec)
+		# 	user_vecs = torch.stack([user_vecs, graph_vec], dim=1)
+		# 	user_vecs = model.loc_glob_att2(user_vecs)
 
 		user_vecs = user_vecs.detach().cpu().numpy()
 		
@@ -143,6 +151,7 @@ cfg = TrainConfig()
 cfg.update(args)
 if cfg.genAbs:
 	cfg.title_size = 50
+os.environ["WANDB_MODE"]="offline"
 wandb.init(
 	# set the wandb project where this run will be logged
 	project="pogram",

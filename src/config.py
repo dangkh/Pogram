@@ -33,8 +33,8 @@ class TrainConfig:
     attention_hidden_dim: int = 200
     dropout_probability: float = 0.2
     his_size : int = 50
-    k_hops: int = 0
-    num_neighbors : int = 3
+    k_hops: int = 1
+    num_neighbors : int = 4
     use_graph : bool = False
     use_entity : bool = False
     use_EnrichE: bool = False
