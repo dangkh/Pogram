@@ -147,7 +147,7 @@ def read_raw_news(cfg, file_path, mode='train'):
             enrichedE = json.load(f)
 
     if cfg.genAbs:
-        with open(cfg.data_dir + '_train/genAbs.json', 'r') as f:
+        with open(cfg.data_dir + '_train/genAbs0.json', 'r') as f:
             genAbs = json.load(f)
             listGenKey = list(genAbs.keys())
 
@@ -447,21 +447,21 @@ def prepare_preprocessed_data(cfg)  -> None:
     prepare_preprocess_bin(cfg, "val")
     # prepare_preprocess_bin(cfg, "test")
 
-    prepare_news_graph(cfg, 'train')
-    prepare_news_graph(cfg, 'val')
+    # prepare_news_graph(cfg, 'train')
+    # prepare_news_graph(cfg, 'val')
     # prepare_news_graph(cfg, 'test')
 
-    prepare_neighbor_list(cfg, 'train', 'news')
-    prepare_neighbor_list(cfg, 'val', 'news')
+    # prepare_neighbor_list(cfg, 'train', 'news')
+    # prepare_neighbor_list(cfg, 'val', 'news')
     # prepare_neighbor_list(cfg, 'test', 'news')
 
-    prepare_entity_graph(cfg, 'train')
-    prepare_entity_graph(cfg, 'val')
-    # prepare_entity_graph(cfg, 'test')
+    # prepare_entity_graph(cfg, 'train')
+    # prepare_entity_graph(cfg, 'val')
+    # # prepare_entity_graph(cfg, 'test')
 
-    prepare_neighbor_list(cfg, 'train', 'entity')
-    prepare_neighbor_list(cfg, 'val', 'entity')
-    # prepare_neighbor_list(cfg, 'test', 'entity')
+    # prepare_neighbor_list(cfg, 'train', 'entity')
+    # prepare_neighbor_list(cfg, 'val', 'entity')
+    # # prepare_neighbor_list(cfg, 'test', 'entity')
 
     # # Entity vec process
     data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}

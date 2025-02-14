@@ -10,3 +10,5 @@
 Graph_naml_model.pth
 *.pyc
 glove.840B.300d.txt
+/wandb
+*.txt

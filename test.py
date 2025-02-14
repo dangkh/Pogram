@@ -85,28 +85,41 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 
 		for user_vec, news_vec, label in zip(user_vecs, news_vecs, labels):
 			tmp = np.mean(label)
-			if tmp == 0 or tmp == 1:
+			if mode == "val" and (tmp == 0 or tmp == 1):
 				continue
 
 			score = np.dot(news_vec, user_vec)
-			auc = roc_auc_score(label, score)
-			mrr = mrr_score(label, score)
-			ndcg5 = ndcg_score(label, score, k=5)
-			ndcg10 = ndcg_score(label, score, k=10)
+			if mode == "test":
+				tasks.append(np.argsort(score)[::-1])
+			else:
+				auc = roc_auc_score(label, score)
+				mrr = mrr_score(label, score)
+				ndcg5 = ndcg_score(label, score, k=5)
+				ndcg10 = ndcg_score(label, score, k=10)
 
-			AUC.append(auc)
-			MRR.append(mrr)
-			nDCG5.append(ndcg5)
-			nDCG10.append(ndcg10)
-	reduced_auc, reduced_mrr, reduced_ndcg5, reduced_ndcg10 = get_mean([AUC, MRR, nDCG5, nDCG10])
-	res = {
-		"auc": reduced_auc,
-		"mrr": reduced_mrr,
-		"ndcg5": reduced_ndcg5,
-		"ndcg10": reduced_ndcg10,
-	}
-	
-	return res
+				AUC.append(auc)
+				MRR.append(mrr)
+				nDCG5.append(ndcg5)
+				nDCG10.append(ndcg10)
+	if mode != "test":
+		reduced_auc, reduced_mrr, reduced_ndcg5, reduced_ndcg10 = get_mean([AUC, MRR, nDCG5, nDCG10])
+		res = {
+			"auc": reduced_auc,
+			"mrr": reduced_mrr,
+			"ndcg5": reduced_ndcg5,
+			"ndcg10": reduced_ndcg10,
+		}
+		
+		return res
+	else:
+		file_path = "predict.txt"
+		with open(file_path, "w") as file:
+			for i, row in enumerate(tasks):
+				tmp = ",".join(map(str, row))
+				file.write(f"{i} [{tmp}]\n")
+
+		print(f"Data successfully written to {file_path}")
+		return "Done!!!"
 cfg = TrainConfig
 
 logging.info("Start")

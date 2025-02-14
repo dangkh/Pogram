@@ -27,8 +27,9 @@ class Panel_TrainDataset(Dataset):
 		self.npratio = cfg.npratio
 		self.cfg = cfg
 		self.neighbor_dict = neighbor_dict
-		self.news_graph = news_graph
-		self.news_graph.x = self.news_graph.x.float()
+		if self.cfg.use_graph:
+			self.news_graph = news_graph
+			self.news_graph.x = self.news_graph.x.float()
 		self.listPrep = []
 		self.prepDatabyUser = []
 		self.prepare()
@@ -58,8 +59,9 @@ class Panel_TrainDataset(Dataset):
 		
 	def prepare(self):
 		self.preprocessDT = []
+		num_line = len(open(self.filename, encoding='utf-8').readlines())
 		with open(self.filename) as f:
-			for line in tqdm(f):
+			for line in tqdm(f, total=num_line):
 				uid, dt = self.line_mapper(line)
 				if len(uid) == 0:
 					continue
@@ -73,7 +75,9 @@ class Panel_TrainDataset(Dataset):
 		if uid not in self.listPrep:
 			click_docs = line[3].split()
 			click_docs = self.trans_to_nindex(click_docs)
-			k_hops_click = self.build_k_hop(click_docs)
+			k_hops_click = click_docs
+			if self.cfg.use_graph:
+				k_hops_click = self.build_k_hop(click_docs)
 			click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
 			user_feature = self.news_combined[click_docs]
 
@@ -118,7 +122,7 @@ class Panel_TrainDataset(Dataset):
 		return len(self.preprocessDT)
 
 class Panel_ValidDataset(Panel_TrainDataset):
-	def __init__(self, filename, news_index, news_score, cfg, neighbor_dict, news_graph):
+	def __init__(self, filename, news_index, news_score, cfg, neighbor_dict, news_graph, mode = "val"):
 		super(Panel_ValidDataset).__init__()
 		self.filename = filename
 		self.news_index = news_index
@@ -127,45 +131,50 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		self.npratio = cfg.npratio
 		self.cfg = cfg
 		self.neighbor_dict = neighbor_dict
-		self.news_graph = news_graph
-		self.news_graph.x = self.news_graph.x.float()
+		if cfg.use_graph:
+			self.news_graph = news_graph
+			self.news_graph.x = self.news_graph.x.float()
+		self.file = open(self.filename, encoding='utf-8').readlines()
+		self.numline = len(self.file)
 		self.listPrep = []
-		self.prepDatabyUser = []
-		self.prepare()
 
+		self.prepDatabyUser = []
+		self.mode = mode
 
 	def line_mapper(self, line):
 		line = line.strip().split('\t')
 		uid = line[1]
-		if uid not in self.listPrep:
-			click_docs = line[3].split()
-			click_docs = self.trans_to_nindex(click_docs)
-			k_hops_click = self.build_k_hop(click_docs)
-			click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
-			user_feature = self.news_score[click_docs]
-
-			if self.cfg.use_graph:
-				subemb = torch.from_numpy(self.news_score[k_hops_click])
-				if self.cfg.use_entity:
-					subemb = subemb[:, :-5]
-				sub_edge_index, sub_edge_attr = subgraph(k_hops_click, self.news_graph.edge_index, self.news_graph.edge_attr, \
-														relabel_nodes=True, num_nodes=self.news_graph.num_nodes)
-				sub_news_graph = Data(x=subemb, edge_index=sub_edge_index, edge_attr=sub_edge_attr)
-				self.prepDatabyUser.append([k_hops_click, sub_news_graph, user_feature, log_mask])
-			else:
-				self.prepDatabyUser.append([k_hops_click, user_feature, log_mask])
-			self.listPrep.append(uid)
-		else:
-			if self.cfg.use_graph:
-				k_hops_click, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
-			else:	
-				k_hops_click, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
+		
+		click_docs = line[3].split()
+		click_docs = self.trans_to_nindex(click_docs)
+		k_hops_click = click_docs
+		click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
+		user_feature = self.news_score[click_docs]
 
 		candidate_news = self.trans_to_nindex([i.split('-')[0] for i in line[4].split()])
-		label = np.array([int(i.split('-')[1]) for i in line[4].split()])
+		if self.mode == "test":
+			label = np.array([0 for i in line[4].split()])
+		else:
+			label = np.array([int(i.split('-')[1]) for i in line[4].split()])
 		news_feature = self.news_score[candidate_news]
 
-		return k_hops_click, [uid, torch.from_numpy(news_feature), torch.tensor(label)]
+		return k_hops_click, [uid, torch.from_numpy(news_feature), torch.tensor(label), user_feature, log_mask]
+
+	def __getitem__(self, idx):
+
+		k_hops_click, [uid, news_feature, label, user_feature, log_mask] = self.line_mapper(self.file[idx])
+
+		sub_news_graph = []
+		# if self.cfg.use_graph:
+		# 	_, sub_news_graph, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
+		# 	sub_news_graph = sub_news_graph.to(device)
+		# else:	
+		# 	_, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
+
+		return sub_news_graph, [torch.from_numpy(user_feature), torch.from_numpy(log_mask), news_feature, label]
+
+	def __len__(self):
+		return self.numline
 
 
 
@@ -180,15 +189,18 @@ class NewsDataset(Dataset):
 		return self.data.shape[0]
 
 def load_dataloader(cfg, mode='train', model=None):
-	data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir + '_val'}
+	data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir + '_test'}
 
 	# ------------- load news.tsv-------------
 	news_index = pickle.load(open(Path(data_dir[mode]) / "news_dict.bin", "rb"))
 
 	news_input = pickle.load(open(Path(data_dir[mode]) / "nltk_token_news.bin", "rb"))
 	# ------------- load behaviors_np{X}.tsv --------------
-	news_neighbors_dict = pickle.load(open(Path(data_dir[mode]) / "news_neighbor_dict.bin", "rb"))
-	news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt", weights_only=False)
+	news_neighbors_dict  = []
+	news_graph = []
+	if cfg.use_graph:
+		news_neighbors_dict = pickle.load(open(Path(data_dir[mode]) / "news_neighbor_dict.bin", "rb"))
+		news_graph = torch.load(Path(data_dir[mode]) / "nltk_news_graph.pt", weights_only=False)
 	if mode == 'train':
 		target_file = Path(data_dir[mode]) / f"behaviors_np{cfg.npratio}_0.tsv"
 		if cfg.use_graph:
@@ -265,7 +277,8 @@ def load_dataloader(cfg, mode='train', model=None):
 					news_score=news_scoring,
 					cfg=cfg,
 					neighbor_dict=news_neighbors_dict,
-					news_graph=news_graph
+					news_graph=news_graph,
+					mode = "test"
 				)
 
 			dataloader = GraphDataLoader(dataset, batch_size=1)
