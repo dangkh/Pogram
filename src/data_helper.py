@@ -126,6 +126,8 @@ def read_parsed_news(cfg, news, news_dict,
     # return news_title, news_entity, news_category, news_subcategory, news_index
     if cfg.use_entity:
         return news_title, news_category, news_subcategory, news_entity
+    if cfg.NRMS:
+        return news_title
     return news_title, news_category, news_subcategory
 
 
@@ -147,7 +149,7 @@ def read_raw_news(cfg, file_path, mode='train'):
             enrichedE = json.load(f)
 
     if cfg.genAbs:
-        with open(cfg.data_dir + '_train/genAbs.json', 'r') as f:
+        with open(cfg.data_dir + '_train/genAbs2.json', 'r') as f:
             genAbs = json.load(f)
             listGenKey = list(genAbs.keys())
 
@@ -455,12 +457,12 @@ def prepare_preprocessed_data(cfg)  -> None:
     prepare_neighbor_list(cfg, 'val', 'news')
     # prepare_neighbor_list(cfg, 'test', 'news')
 
-    prepare_entity_graph(cfg, 'train')
-    prepare_entity_graph(cfg, 'val')
-    # prepare_entity_graph(cfg, 'test')
+    # prepare_entity_graph(cfg, 'train')
+    # prepare_entity_graph(cfg, 'val')
+    # # prepare_entity_graph(cfg, 'test')
 
-    prepare_neighbor_list(cfg, 'train', 'entity')
-    prepare_neighbor_list(cfg, 'val', 'entity')
+    # prepare_neighbor_list(cfg, 'train', 'entity')
+    # prepare_neighbor_list(cfg, 'val', 'entity')
     # prepare_neighbor_list(cfg, 'test', 'entity')
 
     # # Entity vec process

@@ -32,20 +32,20 @@ def train_modelPanel(model, optimizer, dataloader, cfg):
 		loss = 0.0
 		accuary = 0.0
 		print("EPOCH: " + str(ep))
-		for cnt, (g, [log_ids, log_mask, input_ids, targets]) in tqdm(enumerate(dataloader)):
+		for cnt, (g, meta, [log_ids, log_mask, input_ids, targets]) in tqdm(enumerate(dataloader)):
 			log_ids = log_ids.to(device)
 			log_mask = log_mask.to(device)
 			input_ids = input_ids.to(device)
 			targets = targets.to(device)
+			meta = meta.to(device)
 
-			bz_loss, y_hat = model([g, log_ids, log_mask, input_ids, targets])
+			bz_loss, y_hat = model([g,meta, log_ids, log_mask, input_ids, targets])
 			loss += bz_loss.data.float()
 			accuary += acc(targets, y_hat)
 			optimizer.zero_grad()
 			bz_loss.backward()
 			optimizer.step()
 
-		# eval_acc = evaluate_modelPanel(model, cfg)
 		print(loss, accuary)
 		model.train()
 

@@ -60,7 +60,7 @@ def load_model(cfg):
 		entity_emb = None
 	word_dict = pickle.load(open(os.path.join(cfg.data_dir + '_train', "word_dict.bin"), "rb"))
 	glove_emb = load_pretrain_emb(cfg.glove_path, word_dict, cfg.word_emb_dim)
-	model = panel.NAML(glove_emb, entity_emb, len(category_dict), len(subcategory_dict), cfg)
+	model = panel.LSTUR(glove_emb, entity_emb, len(category_dict), len(subcategory_dict), cfg)
 	optimizer = optim.Adam(model.parameters(), lr=0.0003)
 
 	return model, optimizer

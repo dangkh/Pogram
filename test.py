@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 from torch import nn
+import torch.nn.functional as F
 from src.config import TrainConfig 
 from src.ultis import *
 from src.data_helper import prepare_preprocessed_data
@@ -41,9 +42,10 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 	MRR = []
 	nDCG5 = []
 	nDCG10 = []
-	for cnt, (graph_batch, [log_vecs, log_mask, news_vecs, labels]) in tqdm(enumerate(valid_dataloader)):
+	for cnt, (graph_batch, meta, [log_vecs, log_mask, news_vecs, labels]) in tqdm(enumerate(valid_dataloader)):
 		log_vecs = log_vecs.cuda()
 		log_mask = log_mask.cuda()
+		meta = meta.cuda()
 
 		if cfg.use_graph:
 			graph_vec, edge_index, batch = graph_batch.x, graph_batch.edge_index, graph_batch.batch
@@ -73,8 +75,12 @@ def evaluate_modelPanel(model, cfg, mode = 'val'):
 		else:
 			user_vecs = log_vecs.view(-1, model.user_log_length, model.news_dim)
 
-		
-		user_vecs = model.user_encoder(user_vecs, log_mask)
+		long_term_user_repr = model.user_embedding(meta[:,0])
+		_, short_term_user_repr = model.gru(user_vecs)
+		short_term_user_repr = short_term_user_repr.squeeze(0)
+
+		user_vecs = F.normalize(long_term_user_repr + short_term_user_repr, p=2, dim=1)
+		# user_vecs = model.user_encoder(user_vecs, log_mask)
 		if cfg.use_graph:
 			user_vecs = torch.stack([user_vecs, graph_vec], dim=1)
 			user_vecs = model.loc_glob_att(user_vecs)

@@ -1,6 +1,6 @@
 import logging
 from pathlib import Path
-
+import json
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
@@ -32,6 +32,8 @@ class Panel_TrainDataset(Dataset):
 		self.listPrep = []
 		self.prepDatabyUser = []
 		self.prepare()
+		with open("listAllID.json", "w") as file:
+			json.dump(self.listPrep, file)
 
 	def trans_to_nindex(self, nids):
 		return [self.news_index[i] if i in self.news_index else 0 for i in nids]
@@ -71,11 +73,16 @@ class Panel_TrainDataset(Dataset):
 		line = line.strip().split('\t')
 		uid = line[1]
 		if uid not in self.listPrep:
+			self.listPrep.append(uid)
 			click_docs = line[3].split()
 			click_docs = self.trans_to_nindex(click_docs)
+			numclick = len(click_docs)
 			k_hops_click = self.build_k_hop(click_docs)
 			click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
-			user_feature = self.news_combined[click_docs]
+			if self.cfg.LSTUR:
+				user_feature = [self.listPrep.index(uid), numclick, self.news_combined[click_docs]]
+			else:
+				user_feature = self.news_combined[click_docs]
 
 			if self.cfg.use_graph:
 				subemb = self.news_graph.x[k_hops_click]
@@ -85,7 +92,6 @@ class Panel_TrainDataset(Dataset):
 				self.prepDatabyUser.append([k_hops_click, sub_news_graph, user_feature, log_mask])
 			else:
 				self.prepDatabyUser.append([k_hops_click, user_feature, log_mask])
-			self.listPrep.append(uid)
 		else:
 			if self.cfg.use_graph:
 				k_hops_click, _, _, _ = self.prepDatabyUser[self.listPrep.index(uid)]
@@ -107,12 +113,16 @@ class Panel_TrainDataset(Dataset):
 	def __getitem__(self, idx):
 		k_hops_click, [uid, news_feature, label] =  self.preprocessDT[idx]
 		sub_news_graph = []
+		userIDX = []
 		if self.cfg.use_graph:
 			_, sub_news_graph, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
 			sub_news_graph = sub_news_graph.to(device)
 		else:	
 			_, user_feature, log_mask = self.prepDatabyUser[self.listPrep.index(uid)]
-		return sub_news_graph, [torch.from_numpy(user_feature), torch.from_numpy(log_mask), news_feature, label]
+			if self.cfg.LSTUR:
+				meta1, meta2, actual_user_feature = user_feature
+				userIDX = torch.from_numpy(np.asarray([meta1, meta2]))
+		return sub_news_graph, userIDX, [torch.from_numpy(actual_user_feature), torch.from_numpy(log_mask), news_feature, label]
 
 	def __len__(self):
 		return len(self.preprocessDT)
@@ -130,6 +140,9 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		self.news_graph = news_graph
 		self.news_graph.x = self.news_graph.x.float()
 		self.listPrep = []
+		self.listUser = []
+		with open("listAllID.json", "r") as file:
+			self.listUser = json.load(file)
 		self.prepDatabyUser = []
 		self.prepare()
 
@@ -140,9 +153,16 @@ class Panel_ValidDataset(Panel_TrainDataset):
 		if uid not in self.listPrep:
 			click_docs = line[3].split()
 			click_docs = self.trans_to_nindex(click_docs)
+			numclick = len(click_docs)
 			k_hops_click = self.build_k_hop(click_docs)
 			click_docs, log_mask = self.pad_to_fix_len(click_docs, self.user_log_length)
-			user_feature = self.news_score[click_docs]
+			if self.cfg.LSTUR:
+				suid = 50000
+				if uid in self.listUser:
+					suid = self.listUser.index(uid)
+				user_feature = [suid, numclick, self.news_score[click_docs]]
+			else:
+				user_feature = self.news_score[click_docs]
 
 			if self.cfg.use_graph:
 				subemb = torch.from_numpy(self.news_score[k_hops_click])
