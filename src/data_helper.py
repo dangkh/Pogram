@@ -445,7 +445,7 @@ def prepare_preprocessed_data(cfg)  -> None:
 
     prepare_preprocess_bin(cfg, "train")
     prepare_preprocess_bin(cfg, "val")
-    # prepare_preprocess_bin(cfg, "test")
+    prepare_preprocess_bin(cfg, "test")
 
     # prepare_news_graph(cfg, 'train')
     # prepare_news_graph(cfg, 'val')
@@ -464,24 +464,24 @@ def prepare_preprocessed_data(cfg)  -> None:
     # # prepare_neighbor_list(cfg, 'test', 'entity')
 
     # # Entity vec process
-    data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir}
+    # data_dir = {"train": cfg.data_dir + '_train', "val": cfg.data_dir + '_val', "test": cfg.data_dir + '_test'}
 
-    train_entity_emb_path = Path(data_dir['train']) / "entity_embedding.vec"
-    val_entity_emb_path = Path(data_dir['val']) / "entity_embedding.vec"
-    # test_entity_emb_path = Path(data_dir['test']) / "entity_embedding.vec"
+    # train_entity_emb_path = Path(data_dir['train']) / "entity_embedding.vec"
+    # val_entity_emb_path = Path(data_dir['val']) / "entity_embedding.vec"
+    # # test_entity_emb_path = Path(data_dir['test']) / "entity_embedding.vec"
 
-    val_combined_path = Path(data_dir['val']) / "combined_entity_embedding.vec"
-    # test_combined_path = Path(data_dir['test']) / "combined_entity_embedding.vec"
+    # val_combined_path = Path(data_dir['val']) / "combined_entity_embedding.vec"
+    # # test_combined_path = Path(data_dir['test']) / "combined_entity_embedding.vec"
 
-    # Open the first file and read the contents
-    with open(train_entity_emb_path, 'r') as file1:
-        file1_content = file1.readlines()
-    # Open the second file and read the contents
-    with open(val_entity_emb_path, 'r') as file2:
-        file2_content = file2.readlines()
+    # # Open the first file and read the contents
+    # with open(train_entity_emb_path, 'r') as file1:
+    #     file1_content = file1.readlines()
+    # # Open the second file and read the contents
+    # with open(val_entity_emb_path, 'r') as file2:
+    #     file2_content = file2.readlines()
 
-    merged_content = file1_content + file2_content
+    # merged_content = file1_content + file2_content
 
-    # Write the concatenated content to the output file
-    with open(val_combined_path, 'w') as output_file:
-        output_file.writelines(merged_content)
+    # # Write the concatenated content to the output file
+    # with open(val_combined_path, 'w') as output_file:
+    #     output_file.writelines(merged_content)
